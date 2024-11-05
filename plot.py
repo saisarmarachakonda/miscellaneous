@@ -124,3 +124,49 @@ def plot_bar_no_hue(data, x, y, title="Sample Composition"):
 
 # Example of calling the function
 # plot_bar_no_hue(data=my_data, x='category_column', y='percentage_column')
+
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+
+def plot_kde_distribution(data, x_col, title, hue_col=None, palette="coolwarm"):
+    plt.figure(figsize=(9, 6))
+    sns.set(style="white")
+    
+    # Plot with or without hue based on the hue_col parameter
+    if hue_col:
+        sns.kdeplot(
+            data=data, x=x_col, hue=hue_col, fill=True, common_norm=False,
+            palette=palette, alpha=0.8
+        )
+    else:
+        sns.kdeplot(
+            data=data, x=x_col, fill=True, color="#3666AA", alpha=0.8
+        )
+    
+    # Set labels and title
+    plt.ylabel("Density", fontsize=10, color="#3666AA")
+    plt.xlabel(f"{x_col.replace('_', ' ').title()} Score", fontsize=10, color="#3666AA")
+    plt.suptitle(title, fontsize=12, color="#3666AA")
+
+    # Customize plot appearance
+    plt.gca().grid(False)
+    plt.gca().xaxis.grid(True, color="#E0E0E1", linestyle="--", linewidth=0.75)
+    plt.gca().set_facecolor("white")
+    plt.gca().spines['left'].set_visible(False)
+    plt.gca().spines['right'].set_visible(False)
+    plt.gca().spines['top'].set_visible(False)
+    
+    # Customize tick and spine colors
+    plt.tick_params(axis='x', colors="#3666AA")
+    plt.tick_params(axis='y', colors="#3666AA")
+
+    # Customize legend
+    if hue_col:
+        legend = plt.legend()
+        for text in legend.get_texts():
+            text.set_color("#3666AA")
+
+    plt.tight_layout()
+    plt.show()
