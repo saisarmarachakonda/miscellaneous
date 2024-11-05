@@ -94,28 +94,28 @@ create_box_plot(df, x='Segment', y='Value', hue='Sample Type')
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def plot_bar_no_hue(data, x, y, title="Sample composition"):
-    # Create a bar plot without hue
-    fig, ax = plt.subplots(figsize=(10, 6))
-    sns.barplot(data=data, x=x, y=y, ax=ax, palette="coolwarm")
+def plot_bar_no_hue(data, x, y, title="Sample Composition"):
+    # Create a bar plot without hue, using a single color
+    plt.figure(figsize=(10, 6))
+    sns.barplot(data=data, x=x, y=y, color='#1DF91')
 
     # Adding percentage labels to each bar
-    for container in ax.containers:
-        ax.bar_label(container, fmt="%.1f%%", label_type='edge', fontsize=10, color='#63666A')
+    for container in plt.gca().containers:
+        plt.gca().bar_label(container, fmt="%.1f%%", label_type='edge', fontsize=10, color='#63666A')
 
     # Customizing labels and title
-    ax.set_ylabel("Percent", fontsize=10, color="#63666A")
-    ax.set_xlabel(x.replace('_', ' ').title(), fontsize=10, color="#63666A")
-    ax.set_title(title, fontsize=12, color="#63666A")
+    plt.ylabel("Percent", fontsize=10, color="#63666A")
+    plt.xlabel(x.replace('_', ' ').title(), fontsize=10, color="#63666A")
+    plt.title(title, fontsize=12, color="#63666A")
 
     # Customizing tick parameters and grid
-    ax.tick_params(axis='x', colors='#63666A')
-    ax.tick_params(axis='y', colors='#63666A')
-    ax.grid(axis='y', color='#E0E0E1', linestyle='-', linewidth=0.75)
-    ax.set_facecolor('white')
+    plt.xticks(color='#63666A')
+    plt.yticks(color='#63666A')
+    plt.grid(axis='y', color='#E0E0E1', linestyle='-', linewidth=0.75)
+    plt.gca().set_facecolor('white')
 
     # Styling for the plot spines
-    for spine in ax.spines.values():
+    for spine in plt.gca().spines.values():
         spine.set_edgecolor('#E0E0E1')
         spine.set_linewidth(1.5)
 
@@ -124,4 +124,3 @@ def plot_bar_no_hue(data, x, y, title="Sample composition"):
 
 # Example of calling the function
 # plot_bar_no_hue(data=my_data, x='category_column', y='percentage_column')
-
