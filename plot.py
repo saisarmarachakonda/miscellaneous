@@ -217,3 +217,41 @@ def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1.
 # Example usage with a custom color list:
 # colors = ["#FF6347", "#4682B4", "#32CD32"]
 # customized_facetgrid_plot(industry_dpd_by_bin, x_col='Twentiles', y_col='dpd30_90d', facet_col='tl_industry_segment', colors=colors)
+
+
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+
+data = pd.DataFrame({
+    'Category': ['A', 'A', 'B', 'B', 'C', 'C', 'D', 'D', 'E', 'E', 'F', 'F'],
+    'Subcategory': ['X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y'],
+    'Value': [5.5, 3.4, 6, 4, 7, 2, 5, 3, 6.5, 3.5, 7.2, 4.1]
+})
+
+# Define a list of six hex color codes
+hex_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
+
+# Map each unique category to a color, cycling through hex colors if needed
+unique_categories = data['Category'].unique()
+category_colors = {cat: hex_colors[i % len(hex_colors)] for i, cat in enumerate(unique_categories)}
+
+# Initialize the FacetGrid
+g = sns.FacetGrid(data, col="Category", height=4, aspect=0.7)
+
+# Plot each bar with the assigned color for each Category
+for idx, ax in enumerate(g.axes.flat):
+    category = unique_categories[idx]  # Get the Category for the current facet
+    color = category_colors[category]  # Retrieve the color for the current Category
+    sns.barplot(
+        data=data[data['Category'] == category],
+        x="Subcategory", y="Value", color=color, ax=ax
+    )
+
+# Set titles and labels
+g.set_titles("Category {col_name}").set_axis_labels("Subcategory", "Value")
+g.fig.suptitle("Facet Bar Plot with Specific Hex Colors for Each Category", y=1.05)
+
+plt.show()
