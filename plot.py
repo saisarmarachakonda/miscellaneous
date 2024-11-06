@@ -306,3 +306,113 @@ metrics_table = ks_and_auc_by_segment(df, 'segment', 'y_true', 'y_pred')
 print(metrics_table)
 
 
+
+
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve, auc
+import numpy as np
+import pandas as pd
+from matplotlib.patches import FancyBboxPatch
+
+def plot_roc_by_category_with_rounded_rect(y_true, y_pred, category_column=None, colors=None):
+    """
+    Plot ROC curve segmented by categories with a rounded rectangle in the background and custom hex colors.
+    
+    Parameters:
+    - y_true: Array-like, true binary labels
+    - y_pred: Array-like, predicted probabilities for the positive class
+    - category_column: Array-like or None, category labels for segmentation. If None, plot as a single group.
+    - colors: Dictionary, optional mapping of categories to hex color codes for the lines
+    
+    Returns:
+    - None: The function will plot the ROC curves.
+    """
+    
+    # If category_column is None, treat the entire data as one category
+    if category_column is None:
+        category_column = ['All'] * len(y_true)
+    
+    # Create a DataFrame from the input arrays
+    data = pd.DataFrame({
+        'y_true': y_true,
+        'y_pred': y_pred,
+        'category': category_column
+    })
+    
+    # Create custom plots for each category
+    fig, ax = plt.subplots(figsize=(8, 8))
+
+    # Create a rounded rectangle background
+    rounded_rect = FancyBboxPatch(
+        (0, 0), 1, 1, boxstyle="round,pad=0.05,rounding_size=0.1", 
+        linewidth=2, edgecolor='black', facecolor='#f7f7f7', zorder=0
+    )
+    ax.add_patch(rounded_rect)  # Add the rounded rectangle
+
+    # Loop through unique categories
+    for category in data['category'].unique():
+        # Filter data by category
+        category_data = data[data['category'] == category]
+        
+        # Get true labels and predicted probabilities for this category
+        y_true_cat = category_data['y_true']
+        y_pred_cat = category_data['y_pred']
+        
+        # Calculate ROC curve
+        fpr, tpr, thresholds = roc_curve(y_true_cat, y_pred_cat)
+        
+        # Calculate AUC (Area Under Curve)
+        roc_auc = auc(fpr, tpr)
+        
+        # Use custom color for each category, if provided
+        color = colors.get(category, 'b') if colors else 'b'  # Default to blue if no colors specified
+        
+        # Plot the ROC curve for this category
+        ax.plot(fpr, tpr, lw=2, label=f'Category {category} (AUC = {roc_auc:.2f})', color=color)
+
+    # Add the diagonal line (random classifier)
+    ax.plot([0, 1], [0, 1], color='gray', linestyle='--')
+
+    # Customizing the plot
+    ax.set_title('Custom ROC Curve by Category with Rounded Rectangle Background')
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    
+    # Set the axis limits to fit the circle within the plot
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    
+    # Set grid inside the plot
+    ax.grid(True, linestyle='--', alpha=0.5)
+
+    # Remove the ticks and spines outside the rounded rectangle
+    for _, spine in ax.spines.items():
+        spine.set_visible(False)
+        
+    # Set equal aspect ratio for the plot
+    ax.set_aspect('equal')  
+
+    # Move the legend below the graph and remove the border
+    ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.1), ncol=3, fontsize=10, frameon=False)
+    
+    # Show the plot
+    plt.show()
+
+# Example usage:
+# Sample data
+y_true = np.array([0, 1, 1, 0, 1, 0, 1, 0, 0, 1])
+y_pred = np.array([0.1, 0.9, 0.8, 0.2, 0.7, 0.4, 0.9, 0.3, 0.5, 0.85])
+
+# Categories to segment the data by
+category_column = ['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B']
+
+# Define custom hex colors for categories
+category_colors = {
+    'A': '#1f77b4',  # Blue
+    'B': '#ff7f0e',  # Orange
+}
+
+# Call the function to plot ROC curves with a rounded rectangle background and legend below
+plot_roc_by_category_with_rounded_rect(y_true, y_pred, category_column, colors=category_colors)
+
+
