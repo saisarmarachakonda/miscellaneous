@@ -1,4 +1,4 @@
-import matplotlib.pyplot as plt
+hiimport matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -177,50 +177,27 @@ def plot_kde_distribution(data, x_col, title, hue_col=None, palette="coolwarm"):
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# Define a function for bar plotting with faceting
-def plot_facet_bar(data, x, y, hue=None, col=None, row=None, title=None, xlabel=None, ylabel=None, width=1, hline_y=None, hline_label=None):
-    # Set up the FacetGrid
-    g = sns.FacetGrid(data, col=col, row=row, height=4, aspect=width, hue=hue, palette="viridis")
-    g.map(sns.barplot, x, y, order=data[x].unique())
+def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1):
+    # Create FacetGrid
+    g = sns.FacetGrid(data, col=facet_col, height=height, aspect=aspect)
+    g.map_dataframe(sns.barplot, x=x_col, y=y_col)
     
-    # Add percentage labels to each bar
+    # Loop through each axis in the FacetGrid to customize grids and spines
     for ax in g.axes.flat:
-        for container in ax.containers:
-            ax.bar_label(container, fmt="%.1f%%", label_type="edge", fontsize=10, color="#3666AA")
-
-    # Customize labels and title
-    g.set_axis_labels(xlabel, ylabel)
-    g.set_titles(col_template="{col_name}", row_template="{row_name}")
-    g.fig.suptitle(title, fontsize=14, y=1.05)
+        # Customizing Grid Parameters
+        ax.grid(axis='y', color="gray", linestyle="--", linewidth=0.5, visible=True)  # Customize y-axis grid
+        ax.grid(axis='x', visible=False)  # Disable x-axis grid
+        
+        # Customizing the spines
+        for spine in ax.spines.values():
+            spine.set_visible(False)  # Hide all spines
+        ax.spines['bottom'].set_visible(True)  # Enable bottom spine only
+        ax.spines['bottom'].set_color("#63666A")  # Customize color of bottom spine
+        ax.spines['bottom'].set_linewidth(0.7)  # Set linewidth of bottom spine
     
-    # Add a horizontal line if specified
-    if hline_y is not None:
-        for ax in g.axes.flat:
-            ax.axhline(y=hline_y, color="#607D8B", linestyle="--", linewidth=1.5)
-            if hline_label:
-                ax.text(0.02, hline_y, hline_label, color="#607D8B", ha='left', va='center', transform=ax.get_yaxis_transform())
-    
-    # Customize tick parameters
-    for ax in g.axes.flat:
-        ax.tick_params(axis='x', color='#3666AA', labelsize=10)
-        ax.tick_params(axis='y', color='#3666AA', labelsize=10)
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x)}%'))
-
+    # Adjust layout
     plt.tight_layout()
     plt.show()
 
-# Example usage with your data
-plot_facet_bar(
-    data=your_dataframe,  # Replace with your DataFrame
-    x="category_column",  # Replace with your x-axis column
-    y="value_column",     # Replace with your y-axis column
-    hue="hue_column",     # Optional: replace with a column for coloring
-    col="facet_column",   # Optional: replace with a column for columns of facets
-    row="facet_row_column", # Optional: replace with a column for rows of facets
-    title="Title of Plot",
-    xlabel="X-axis Label",
-    ylabel="Y-axis Label",
-    width=0.9,
-    hline_y=50,           # Optional: horizontal line at y=50
-    hline_label="Threshold"
-)
+# Example usage:
+# customized_facetgrid_plot(industry_dpd_by_bin, x_col='Twentiles', y_col='dpd30_90d', facet_col='tl_industry_segment')
