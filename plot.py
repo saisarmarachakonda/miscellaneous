@@ -1,4 +1,4 @@
-hiimport matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -173,16 +173,23 @@ def plot_kde_distribution(data, x_col, title, hue_col=None, palette="coolwarm"):
 
 
 
-
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1):
+def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1, colors=None):
     # Create FacetGrid
     g = sns.FacetGrid(data, col=facet_col, height=height, aspect=aspect)
-    g.map_dataframe(sns.barplot, x=x_col, y=y_col)
     
-    # Loop through each axis in the FacetGrid to customize grids and spines
+    # Apply colors iteratively if a list of colors is provided
+    if colors:
+        for i, ax in enumerate(g.axes.flat):
+            color = colors[i % len(colors)]  # Cycle through colors if there are more facets than colors
+            sns.barplot(data=data, x=x_col, y=y_col, ax=ax, color=color)
+    else:
+        # Default color if no custom colors are provided
+        g.map_dataframe(sns.barplot, x=x_col, y=y_col, color="skyblue")
+    
+    # Loop through each axis in the FacetGrid to customize grids, spines, and remove labels
     for ax in g.axes.flat:
         # Customizing Grid Parameters
         ax.grid(axis='y', color="gray", linestyle="--", linewidth=0.5, visible=True)  # Customize y-axis grid
@@ -194,10 +201,19 @@ def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1)
         ax.spines['bottom'].set_visible(True)  # Enable bottom spine only
         ax.spines['bottom'].set_color("#63666A")  # Customize color of bottom spine
         ax.spines['bottom'].set_linewidth(0.7)  # Set linewidth of bottom spine
+        
+        # Remove x and y labels
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+    
+    # Customize facet titles to show only the value
+    for ax, title in zip(g.axes.flat, g.col_names):
+        ax.set_title(title)  # Set each title to show only the facet value
     
     # Adjust layout
     plt.tight_layout()
     plt.show()
 
-# Example usage:
-# customized_facetgrid_plot(industry_dpd_by_bin, x_col='Twentiles', y_col='dpd30_90d', facet_col='tl_industry_segment')
+# Example usage with a custom color list:
+# colors = ["#FF6347", "#4682B4", "#32CD32"]
+# customized_facetgrid_plot(industry_dpd_by_bin, x_col='Twentiles', y_col='dpd30_90d', facet_col='tl_industry_segment', colors=colors)
