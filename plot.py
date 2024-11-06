@@ -247,3 +247,62 @@ create_facet_bar_plot(data, hex_colors,
                        height=4, 
                        title="Custom Facet Bar Plot with Horizontal Gridlines")
 
+
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import roc_curve, roc_auc_score
+
+def ks_and_auc_by_segment(df, segment_column, true_column, pred_column):
+    """
+    Computes the Kolmogorov-Smirnov (KS) statistic and AUC by segment and returns the results as a table.
+
+    Parameters:
+    df (pd.DataFrame): The input dataframe containing the data.
+    segment_column (str): The name of the column for segmentation (categorical variable).
+    true_column (str): The name of the column containing the true binary labels.
+    pred_column (str): The name of the column containing the predicted probabilities.
+
+    Returns:
+    pd.DataFrame: A table (DataFrame) with segments, their corresponding KS statistics, and AUC values.
+    """
+    results = []
+
+    # Group by segment and calculate KS and AUC for each group
+    for segment, group in df.groupby(segment_column):
+        y_true = group[true_column]
+        y_pred = group[pred_column]
+
+        # Calculate the ROC curve
+        fpr, tpr, thresholds = roc_curve(y_true, y_pred)
+
+        # Calculate KS statistic
+        ks_statistic = max(tpr - fpr)
+
+        # Calculate AUC
+        auc_value = roc_auc_score(y_true, y_pred)
+
+        results.append({'Segment': segment, 'KS Statistic': ks_statistic, 'AUC': auc_value})
+
+    # Create a DataFrame for the results
+    results_df = pd.DataFrame(results)
+
+    return results_df
+
+# Example usage
+# Sample Data: Replace these with your actual data
+data = {
+    'y_true': np.random.randint(0, 2, size=1000),  # True labels (0 or 1)
+    'y_pred': np.random.rand(1000),  # Predicted probabilities
+    'segment': np.random.choice(['A', 'B', 'C'], size=1000)  # Segments for evaluation
+}
+
+df = pd.DataFrame(data)
+
+# Generate the table with both KS and AUC metrics by segment
+metrics_table = ks_and_auc_by_segment(df, 'segment', 'y_true', 'y_pred')
+
+# Display the table with KS and AUC metrics
+print(metrics_table)
+
+
