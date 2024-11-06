@@ -173,58 +173,63 @@ def plot_kde_distribution(data, x_col, title, hue_col=None, palette="coolwarm"):
 
 
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1.2, colors=None):
-    # Create FacetGrid with increased height and aspect
-    g = sns.FacetGrid(data, col=facet_col, height=height, aspect=aspect)
-    
-    # Apply colors iteratively if a list of colors is provided
-    if colors:
-        for i, ax in enumerate(g.axes.flat):
-            color = colors[i % len(colors)]  # Cycle through colors if there are more facets than colors
-            sns.barplot(data=data, x=x_col, y=y_col, ax=ax, color=color)
-    else:
-        # Default color if no custom colors are provided
-        g.map_dataframe(sns.barplot, x=x_col, y=y_col, color="skyblue")
-    
-    # Loop through each axis in the FacetGrid to customize grids, spines, and remove labels
-    for ax in g.axes.flat:
-        # Customizing Grid Parameters
-        ax.grid(axis='y', color="gray", linestyle="--", linewidth=0.5, visible=True)  # Customize y-axis grid
-        ax.grid(axis='x', visible=False)  # Disable x-axis grid
-        
-        # Customizing the spines
-        for spine in ax.spines.values():
-            spine.set_visible(False)  # Hide all spines
-        ax.spines['bottom'].set_visible(True)  # Enable bottom spine only
-        ax.spines['bottom'].set_color("#63666A")  # Customize color of bottom spine
-        ax.spines['bottom'].set_linewidth(0.7)  # Set linewidth of bottom spine
-        
-        # Remove x and y labels
-        ax.set_xlabel("")
-        ax.set_ylabel("")
-    
-    # Set titles to show only the facet value
-    g.set_titles("{col_name}")  # This will only show the column value without prefix
-
-    # Adjust layout with padding to prevent overlap
-    g.tight_layout(pad=2)
-    
-    plt.show()
-
-# Example usage with a custom color list:
-# colors = ["#FF6347", "#4682B4", "#32CD32"]
-# customized_facetgrid_plot(industry_dpd_by_bin, x_col='Twentiles', y_col='dpd30_90d', facet_col='tl_industry_segment', colors=colors)
-
-
-
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+def create_facet_bar_plot(data, hex_colors, x="Subcategory", y="Value", col="Category", 
+                          height=4, title="Facet Bar Plot with Custom Colors"):
+    """
+    Create a facet bar plot with unique colors for each category and horizontal gridlines.
+    Also, removes ticks' dashes and axis lines.
 
+    Parameters:
+    - data: DataFrame containing the data.
+    - hex_colors: List of hex color codes for the categories.
+    - x: The name of the column to use for the x-axis.
+    - y: The name of the column to use for the y-axis.
+    - col: The name of the column to facet the grid by.
+    - height: Height of each facet plot.
+    - title: Title of the plot.
+    """
+    # Map each unique category to a color, cycling through hex colors if needed
+    unique_categories = data[col].unique()
+    category_colors = {cat: hex_colors[i % len(hex_colors)] for i, cat in enumerate(unique_categories)}
+
+    # Initialize the FacetGrid
+    g = sns.FacetGrid(data, col=col, height=height, aspect=0.7)
+
+    # Plot each bar with the assigned color for each Category
+    for idx, ax in enumerate(g.axes.flat):
+        category = unique_categories[idx]  # Get the Category for the current facet
+        color = category_colors[category]  # Retrieve the color for the current Category
+        sns.barplot(
+            data=data[data[col] == category],
+            x=x, y=y, color=color, ax=ax
+        )
+        # Send gridlines to the background
+        ax.set_axisbelow(True)
+
+        # Display only horizontal gridlines (on the y-axis)
+        ax.grid(axis='y', color='lightgray', linestyle='-', linewidth=0.5)
+
+        # Set font properties for x and y ticks
+        ax.tick_params(axis='x', labelrotation=45, labelbottom=True, length=0)  # Remove x ticks' dashes
+        ax.tick_params(axis='y', length=0)  # Remove y ticks' dashes
+
+        # Remove the axis lines (spines)
+        ax.spines['top'].set_visible(False)  # Hide the top axis line
+        ax.spines['right'].set_visible(False)  # Hide the right axis line
+        ax.spines['left'].set_visible(False)  # Hide the left axis line
+        ax.spines['bottom'].set_visible(False)  # Hide the bottom axis line
+
+    # Set titles and labels
+    g.set_titles("Category {col_name}").set_axis_labels(x, y)
+    g.fig.suptitle(title, y=1.05)
+
+    plt.show()
+
+# Example Usage
 data = pd.DataFrame({
     'Category': ['A', 'A', 'B', 'B', 'C', 'C', 'D', 'D', 'E', 'E', 'F', 'F'],
     'Subcategory': ['X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y', 'X', 'Y'],
@@ -234,24 +239,11 @@ data = pd.DataFrame({
 # Define a list of six hex color codes
 hex_colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"]
 
-# Map each unique category to a color, cycling through hex colors if needed
-unique_categories = data['Category'].unique()
-category_colors = {cat: hex_colors[i % len(hex_colors)] for i, cat in enumerate(unique_categories)}
+# Call the function with custom parameters
+create_facet_bar_plot(data, hex_colors, 
+                       x="Subcategory", 
+                       y="Value", 
+                       col="Category", 
+                       height=4, 
+                       title="Custom Facet Bar Plot with Horizontal Gridlines")
 
-# Initialize the FacetGrid
-g = sns.FacetGrid(data, col="Category", height=4, aspect=0.7)
-
-# Plot each bar with the assigned color for each Category
-for idx, ax in enumerate(g.axes.flat):
-    category = unique_categories[idx]  # Get the Category for the current facet
-    color = category_colors[category]  # Retrieve the color for the current Category
-    sns.barplot(
-        data=data[data['Category'] == category],
-        x="Subcategory", y="Value", color=color, ax=ax
-    )
-
-# Set titles and labels
-g.set_titles("Category {col_name}").set_axis_labels("Subcategory", "Value")
-g.fig.suptitle("Facet Bar Plot with Specific Hex Colors for Each Category", y=1.05)
-
-plt.show()
