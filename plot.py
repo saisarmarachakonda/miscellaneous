@@ -176,8 +176,8 @@ def plot_kde_distribution(data, x_col, title, hue_col=None, palette="coolwarm"):
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1, colors=None):
-    # Create FacetGrid
+def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1.2, colors=None):
+    # Create FacetGrid with increased height and aspect
     g = sns.FacetGrid(data, col=facet_col, height=height, aspect=aspect)
     
     # Apply colors iteratively if a list of colors is provided
@@ -206,12 +206,12 @@ def customized_facetgrid_plot(data, x_col, y_col, facet_col, height=4, aspect=1,
         ax.set_xlabel("")
         ax.set_ylabel("")
     
-    # Customize facet titles to show only the value
-    for ax, title in zip(g.axes.flat, g.col_names):
-        ax.set_title(title)  # Set each title to show only the facet value
+    # Set titles to show only the facet value
+    g.set_titles("{col_name}")  # This will only show the column value without prefix
+
+    # Adjust layout with padding to prevent overlap
+    g.tight_layout(pad=2)
     
-    # Adjust layout
-    plt.tight_layout()
     plt.show()
 
 # Example usage with a custom color list:
