@@ -1,3 +1,46 @@
+from pyspark.ml.feature import Tokenizer, HashingTF, IDF
+from pyspark.sql import functions as F
+from pyspark.ml.linalg import DenseVector
+
+# Tokenize the employer names
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
+tokenized_df = tokenizer.transform(spark_df)
+
+# Apply HashingTF to convert tokens into term frequency vectors
+hashing_tf = HashingTF(inputCol="tokens", outputCol="raw_features", numFeatures=10000)
+tf_df = hashing_tf.transform(tokenized_df)
+
+# Apply IDF to compute the inverse document frequency and get TF-IDF features
+idf = IDF(inputCol="raw_features", outputCol="features")
+idf_model = idf.fit(tf_df)
+tfidf_df = idf_model.transform(tf_df)
+
+# Self-join the DataFrame for pairwise similarity calculation
+similar_pairs = tfidf_df.alias("df1").crossJoin(tfidf_df.alias("df2"))
+
+# Calculate cosine similarity: cosine similarity = (A . B) / (||A|| * ||B||)
+similar_pairs = similar_pairs.withColumn(
+    "cosine_similarity",
+    (F.expr("df1.features.dot(df2.features)") / 
+    (F.norm(df1.features, 2) * F.norm(df2.features, 2)))
+)
+
+# Filter pairs with cosine similarity greater than 0.8 (you can adjust this threshold)
+similar_pairs_filtered = similar_pairs.filter(
+    (col("cosine_similarity") > 0.8) &
+    (col("df1.employer_name") != col("df2.employer_name"))
+)
+
+# Show filtered pairs with similarity score
+similar_pairs_filtered.select(
+    col("df1.employer_name").alias("Name1"),
+    col("df2.employer_name").alias("Name2"),
+    col("cosine_similarity")
+).show(truncate=False)
+
+
+############33
+
 from pyspark.sql.functions import col, levenshtein
 
 # Filter based on Levenshtein distance (e.g., less than 3 edit operations)
