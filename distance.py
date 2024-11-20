@@ -25,38 +25,37 @@ model = word2Vec.fit(df_words)
 df_word2vec = model.transform(df_words)
 
 # Show vectorized results (Word2Vec embeddings)
-df_word2vec.select("employer_name", "result").show()
+df_word2vec.select("employer_name", "result").show(truncate=False)
 
-# Step 3: Calculate Cosine Similarity between Word2Vec vectors
-
+# Step 3: Define the cosine similarity function for vectors
 def cosine_similarity(v1, v2):
     return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
 
 # Create a UDF for cosine similarity
 cosine_udf = F.udf(cosine_similarity, returnType=FloatType())
 
-# Cross join to compare all pairs
+# Cross join to compare all pairs (including self-comparison for checking)
 df_cross = df_word2vec.alias('df1').crossJoin(df_word2vec.alias('df2'))
 
-# Calculate cosine similarity
+# Step 4: Calculate cosine similarity
 df_similarity = df_cross.withColumn(
     "cosine_similarity",
     cosine_udf(F.col("df1.result"), F.col("df2.result"))
 )
 
-# Step 4: Filter employer names based on similarity threshold
+# Step 5: Filter employer names based on similarity threshold
 threshold = 0.85  # Set your desired threshold
 df_similar = df_similarity.filter(
     (F.col("cosine_similarity") >= threshold) & 
     (F.col("df1.employer_name") != F.col("df2.employer_name"))
 )
 
-# Step 5: Select and rename columns for output
+# Step 6: Select and rename columns for output (show only name1, name2, and similarity)
 df_final = df_similar.select(
     F.col("df1.employer_name").alias("name1"),
     F.col("df2.employer_name").alias("name2"),
     "cosine_similarity"
-)
+).withColumnRenamed("cosine_similarity", "similarity")
 
 # Show the filtered similar names with their similarity score
 df_final.show(truncate=False)
