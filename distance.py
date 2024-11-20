@@ -1,58 +1,32 @@
-from pyspark.ml.feature import Tokenizer, HashingTF, IDF
-from pyspark.sql import functions as F
-from pyspark.ml.linalg import DenseVector
 
-# Tokenize the employer names
-tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
-tokenized_df = tokenizer.transform(spark_df)
+# Tokenize employer names into words
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
+df = tokenizer.transform(df)
 
-# Apply HashingTF to convert tokens into term frequency vectors
-hashing_tf = HashingTF(inputCol="tokens", outputCol="raw_features", numFeatures=10000)
-tf_df = hashing_tf.transform(tokenized_df)
+# Define a function to calculate Jaccard similarity between two sets
+def jaccard_similarity(set1, set2):
+    intersection = len(set1.intersection(set2))
+    union = len(set1.union(set2))
+    return intersection / union if union != 0 else 0.0
 
-# Apply IDF to compute the inverse document frequency and get TF-IDF features
-idf = IDF(inputCol="raw_features", outputCol="features")
-idf_model = idf.fit(tf_df)
-tfidf_df = idf_model.transform(tf_df)
+# Register the UDF
+jaccard_udf = udf(jaccard_similarity, DoubleType())
 
-# Self-join the DataFrame for pairwise similarity calculation
-similar_pairs = tfidf_df.alias("df1").crossJoin(tfidf_df.alias("df2"))
+# Create a self-join to compare all employer names with each other
+df_with_similarity = df.alias("df1").crossJoin(df.alias("df2"))
 
-# Calculate the dot product between vectors
-similar_pairs = similar_pairs.withColumn(
-    "dot_product",
-    F.expr("df1.features.dot(df2.features)")
+# Apply Jaccard similarity UDF on pairs of employer names
+similarity_df = df_with_similarity.withColumn(
+    "similarity",
+    jaccard_udf(col("df1.words"), col("df2.words"))
 )
 
-# Manually calculate L2 norm (Euclidean norm) of the feature vectors
-similar_pairs = similar_pairs.withColumn(
-    "l2_norm_df1",
-    F.sqrt(F.expr("aggregate(df1.features, 0D, (acc, x) -> acc + x*x)"))
-)
+# Filter out pairs that are very similar (choose your threshold, e.g., 0.8)
+threshold = 0.8
+similar_pairs = similarity_df.filter(col("similarity") > threshold)
 
-similar_pairs = similar_pairs.withColumn(
-    "l2_norm_df2",
-    F.sqrt(F.expr("aggregate(df2.features, 0D, (acc, x) -> acc + x*x)"))
-)
-
-# Calculate cosine similarity: cosine_similarity = dot_product / (l2_norm_df1 * l2_norm_df2)
-similar_pairs = similar_pairs.withColumn(
-    "cosine_similarity",
-    F.col("dot_product") / (F.col("l2_norm_df1") * F.col("l2_norm_df2"))
-)
-
-# Filter pairs with cosine similarity greater than 0.8 (you can adjust this threshold)
-similar_pairs_filtered = similar_pairs.filter(
-    (F.col("cosine_similarity") > 0.8) &
-    (F.col("df1.employer_name") != F.col("df2.employer_name"))
-)
-
-# Show filtered pairs with similarity score
-similar_pairs_filtered.select(
-    F.col("df1.employer_name").alias("Name1"),
-    F.col("df2.employer_name").alias("Name2"),
-    F.col("cosine_similarity")
-).show(truncate=False)
+# Show similar employer name pairs
+similar_pairs.select("df1.employer_name", "df2.employer_name", "similarity").show()
 
 
 
