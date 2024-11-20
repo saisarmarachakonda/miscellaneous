@@ -18,25 +18,42 @@ tfidf_df = idf_model.transform(tf_df)
 # Self-join the DataFrame for pairwise similarity calculation
 similar_pairs = tfidf_df.alias("df1").crossJoin(tfidf_df.alias("df2"))
 
-# Calculate cosine similarity: cosine similarity = (A . B) / (||A|| * ||B||)
+# Calculate the dot product between vectors
+similar_pairs = similar_pairs.withColumn(
+    "dot_product",
+    F.expr("df1.features.dot(df2.features)")
+)
+
+# Manually calculate L2 norm (Euclidean norm) of the feature vectors
+similar_pairs = similar_pairs.withColumn(
+    "l2_norm_df1",
+    F.sqrt(F.expr("aggregate(df1.features, 0D, (acc, x) -> acc + x*x)"))
+)
+
+similar_pairs = similar_pairs.withColumn(
+    "l2_norm_df2",
+    F.sqrt(F.expr("aggregate(df2.features, 0D, (acc, x) -> acc + x*x)"))
+)
+
+# Calculate cosine similarity: cosine_similarity = dot_product / (l2_norm_df1 * l2_norm_df2)
 similar_pairs = similar_pairs.withColumn(
     "cosine_similarity",
-    (F.expr("df1.features.dot(df2.features)") / 
-    (F.norm(df1.features, 2) * F.norm(df2.features, 2)))
+    F.col("dot_product") / (F.col("l2_norm_df1") * F.col("l2_norm_df2"))
 )
 
 # Filter pairs with cosine similarity greater than 0.8 (you can adjust this threshold)
 similar_pairs_filtered = similar_pairs.filter(
-    (col("cosine_similarity") > 0.8) &
-    (col("df1.employer_name") != col("df2.employer_name"))
+    (F.col("cosine_similarity") > 0.8) &
+    (F.col("df1.employer_name") != F.col("df2.employer_name"))
 )
 
 # Show filtered pairs with similarity score
 similar_pairs_filtered.select(
-    col("df1.employer_name").alias("Name1"),
-    col("df2.employer_name").alias("Name2"),
-    col("cosine_similarity")
+    F.col("df1.employer_name").alias("Name1"),
+    F.col("df2.employer_name").alias("Name2"),
+    F.col("cosine_similarity")
 ).show(truncate=False)
+
 
 
 ############33
