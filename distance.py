@@ -3,13 +3,16 @@
 tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
 df = tokenizer.transform(df)
 
-# Define a function to calculate Jaccard similarity between two sets
-def jaccard_similarity(set1, set2):
+# Define a function to calculate Jaccard similarity between two lists
+def jaccard_similarity(list1, list2):
+    # Convert the lists to sets
+    set1 = set(list1)
+    set2 = set(list2)
     intersection = len(set1.intersection(set2))
     union = len(set1.union(set2))
     return intersection / union if union != 0 else 0.0
 
-# Register the UDF
+# Register the UDF with proper handling of input
 jaccard_udf = udf(jaccard_similarity, DoubleType())
 
 # Create a self-join to compare all employer names with each other
