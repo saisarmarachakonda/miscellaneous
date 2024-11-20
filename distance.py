@@ -1,3 +1,34 @@
+from pyspark.ml.feature import Tokenizer, HashingTF, MinHashLSH
+from pyspark.sql.functions import col
+
+# Tokenize the employer names
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
+tokenized_df = tokenizer.transform(spark_df)
+
+# Apply HashingTF to generate hashed features
+hashing_tf = HashingTF(inputCol="tokens", outputCol="features", numFeatures=10000)
+tf_df = hashing_tf.transform(tokenized_df)
+
+# Apply MinHashLSH for approximate similarity
+minhash_lsh = MinHashLSH(inputCol="features", outputCol="hashes", numHashTables=3)
+lsh_model = minhash_lsh.fit(tf_df)
+
+# Find duplicate employer names (self-join using LSH)
+similar_pairs = lsh_model.approxSimilarityJoin(tf_df, tf_df, 0.8, distCol="similarity")
+
+# Filter out self-matches
+similar_pairs_filtered = similar_pairs.filter(
+    col("datasetA.employer_name") != col("datasetB.employer_name")
+)
+
+# Display results
+similar_pairs_filtered.select(
+    col("datasetA.employer_name").alias("Employer1"),
+    col("datasetB.employer_name").alias("Employer2"),
+    col("similarity")
+).show(truncate=False)
+
+
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
