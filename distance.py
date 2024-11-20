@@ -12,7 +12,7 @@ def jaccard_similarity(list1, list2):
     union = len(set1.union(set2))
     return intersection / union if union != 0 else 0.0
 
-# Register the UDF with proper handling of input
+# Register the UDF
 jaccard_udf = udf(jaccard_similarity, DoubleType())
 
 # Create a self-join to compare all employer names with each other
@@ -30,7 +30,6 @@ similar_pairs = similarity_df.filter(col("similarity") > threshold)
 
 # Show similar employer name pairs
 similar_pairs.select("df1.employer_name", "df2.employer_name", "similarity").show()
-
 
 
 ############33
