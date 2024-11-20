@@ -1,3 +1,131 @@
+from pyspark.sql.functions import col, levenshtein
+
+# Filter based on Levenshtein distance (e.g., less than 3 edit operations)
+filtered_similar_pairs = similar_pairs_filtered.filter(
+    (col("similarity") > 0.8) & 
+    (levenshtein(col("datasetA.employer_name"), col("datasetB.employer_name")) < 3)
+)
+
+filtered_similar_pairs.select(
+    col("datasetA.employer_name").alias("Name1"),
+    col("datasetB.employer_name").alias("Name2"),
+    col("similarity")
+).show(truncate=False)
+
+
+
+#########
+from pyspark.sql.functions import soundex
+
+# Add Soundex column for employer names
+df_with_soundex = spark_df.withColumn("soundex_code", soundex(col("employer_name")))
+
+# Self-join on Soundex codes
+similar_pairs = df_with_soundex.alias("df1").join(
+    df_with_soundex.alias("df2"),
+    col("df1.soundex_code") == col("df2.soundex_code")
+)
+
+similar_pairs.select(
+    col("df1.employer_name").alias("Name1"),
+    col("df2.employer_name").alias("Name2"),
+    col("df1.soundex_code").alias("SoundexCode")
+).show(truncate=False)
+
+
+
+##########
+from pyspark.ml.feature import Tokenizer, HashingTF, MinHashLSH
+from pyspark.sql.functions import col
+
+# Tokenize the employer names
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
+tokenized_df = tokenizer.transform(spark_df)
+
+# Apply HashingTF
+hashing_tf = HashingTF(inputCol="tokens", outputCol="features", numFeatures=10000)
+tf_df = hashing_tf.transform(tokenized_df)
+
+# Apply MinHashLSH for approximate similarity
+minhash_lsh = MinHashLSH(inputCol="features", outputCol="hashes", numHashTables=3)
+lsh_model = minhash_lsh.fit(tf_df)
+
+# Find similar pairs
+similar_pairs = lsh_model.approxSimilarityJoin(tf_df, tf_df, 0.8, distCol="similarity")
+
+# Filter out self-matches
+similar_pairs_filtered = similar_pairs.filter(
+    col("datasetA.employer_name") != col("datasetB.employer_name")
+)
+
+similar_pairs_filtered.select(
+    col("datasetA.employer_name").alias("Name1"),
+    col("datasetB.employer_name").alias("Name2"),
+    col("similarity")
+).show(truncate=False)
+
+
+###############
+
+from pyspark.ml.feature import HashingTF, IDF
+from pyspark.sql.functions import col
+
+# Tokenize and hash the employer names
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
+tokenized_df = tokenizer.transform(spark_df)
+
+hashing_tf = HashingTF(inputCol="tokens", outputCol="raw_features", numFeatures=10000)
+tf_df = hashing_tf.transform(tokenized_df)
+
+idf = IDF(inputCol="raw_features", outputCol="features")
+idf_model = idf.fit(tf_df)
+tfidf_df = idf_model.transform(tf_df)
+
+# Self-join for cosine similarity
+similar_pairs = tfidf_df.alias("df1").crossJoin(tfidf_df.alias("df2"))
+similar_pairs = similar_pairs.withColumn(
+    "cosine_similarity",
+    (col("df1.features").dot(col("df2.features"))) / 
+    (col("df1.features").norm(2) * col("df2.features").norm(2))
+)
+
+# Filter based on similarity > 0.8
+similar_pairs_filtered = similar_pairs.filter(
+    (col("cosine_similarity") > 0.8) & 
+    (col("df1.employer_name") != col("df2.employer_name"))
+)
+
+similar_pairs_filtered.select(
+    col("df1.employer_name").alias("Name1"),
+    col("df2.employer_name").alias("Name2"),
+    col("cosine_similarity")
+).show(truncate=False)
+
+
+############
+from pyspark.ml.clustering import KMeans
+from pyspark.ml.feature import HashingTF
+
+# Tokenize and hash employer names
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="tokens")
+tokenized_df = tokenizer.transform(spark_df)
+
+hashing_tf = HashingTF(inputCol="tokens", outputCol="features", numFeatures=10000)
+tf_df = hashing_tf.transform(tokenized_df)
+
+# Apply KMeans clustering
+kmeans = KMeans(featuresCol="features", predictionCol="cluster", k=5)
+model = kmeans.fit(tf_df)
+clustered_df = model.transform(tf_df)
+
+# Show clustered data
+clustered_df.select("employer_name", "cluster").show(truncate=False)
+
+
+
+
+
+
 from pyspark.ml.feature import Tokenizer, HashingTF, MinHashLSH
 from pyspark.sql.functions import col
 
