@@ -1,6 +1,8 @@
-from pyspark.ml.feature import Word2Vec
-from pyspark.ml.linalg import Vectors
 from pyspark.sql import functions as F
+from pyspark.ml.feature import Tokenizer, Word2Vec
+from pyspark.ml.linalg import Vectors
+from pyspark.sql.types import FloatType
+from pyspark.ml.linalg import DenseVector
 
 # Sample DataFrame
 data = [
@@ -14,11 +16,11 @@ columns = ["employer_name"]
 
 df = spark.createDataFrame(data, columns)
 
-# Step 1: Tokenize employer names (splitting words)
+# Step 1: Tokenize the employer_name column (splitting words)
 tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
 df_words = tokenizer.transform(df)
 
-# Step 2: Train Word2Vec model on the 'words' column
+# Step 2: Train the Word2Vec model on the 'words' column
 word2Vec = Word2Vec(vectorSize=100, minCount=1, inputCol="words", outputCol="result")
 model = word2Vec.fit(df_words)
 df_word2vec = model.transform(df_words)
@@ -27,13 +29,12 @@ df_word2vec = model.transform(df_words)
 df_word2vec.select("employer_name", "result").show()
 
 # Step 3: Calculate Cosine Similarity between Word2Vec vectors
-from pyspark.ml.linalg import Vectors
 
 def cosine_similarity(v1, v2):
     return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
 
 # Create a UDF for cosine similarity
-cosine_udf = F.udf(cosine_similarity, returnType=F.FloatType())
+cosine_udf = F.udf(cosine_similarity, returnType=FloatType())
 
 # Cross join to compare all pairs
 df_cross = df_word2vec.alias('df1').crossJoin(df_word2vec.alias('df2'))
@@ -44,8 +45,12 @@ df_similarity = df_cross.withColumn(
     cosine_udf(F.col("df1.result"), F.col("df2.result"))
 )
 
-# Show the result
-df_similarity.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
+# Step 4: Filter employer names based on similarity threshold
+threshold = 0.85  # Set your desired threshold
+df_similar = df_similarity.filter((F.col("cosine_similarity") >= threshold) & (F.col("df1.employer_name") != F.col("df2.employer_name")))
+
+# Show the similar employer names
+df_similar.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
 
 
 ############
