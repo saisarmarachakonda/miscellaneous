@@ -1,7 +1,7 @@
 from pyspark.sql import functions as F
 from pyspark.ml.feature import Tokenizer, HashingTF, IDF
 from pyspark.ml.linalg import Vectors
-from pyspark.ml.stat import Summarizer
+from pyspark.sql.types import FloatType
 
 # Sample DataFrame
 data = [
@@ -30,13 +30,13 @@ df_tfidf = idf_model.transform(df_tf)
 
 # Step 4: Compute Cosine Similarity
 from pyspark.ml.linalg import Vectors
-from pyspark.sql.functions import col
 
+# Define cosine similarity function
 def cosine_similarity(v1, v2):
     return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
 
 # Create a UDF for cosine similarity
-cosine_udf = F.udf(cosine_similarity, returnType=F.FloatType())
+cosine_udf = F.udf(cosine_similarity, returnType=FloatType())
 
 # Cross join to compare all pairs
 df_cross = df_tfidf.alias('df1').crossJoin(df_tfidf.alias('df2'))
@@ -49,6 +49,7 @@ df_similarity = df_cross.withColumn(
 
 # Show the result
 df_similarity.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
+
 
 
 
