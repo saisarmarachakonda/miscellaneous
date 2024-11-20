@@ -1,3 +1,54 @@
+from pyspark.ml.feature import Word2Vec
+from pyspark.ml.linalg import Vectors
+from pyspark.sql import functions as F
+
+# Sample DataFrame
+data = [
+    ("WALMART",),
+    ("WAL MART",),
+    ("Walmart",),
+    ("TARGET",),
+    ("TARGIT",)
+]
+columns = ["employer_name"]
+
+df = spark.createDataFrame(data, columns)
+
+# Step 1: Tokenize employer names (splitting words)
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
+df_words = tokenizer.transform(df)
+
+# Step 2: Train Word2Vec model on the 'words' column
+word2Vec = Word2Vec(vectorSize=100, minCount=1, inputCol="words", outputCol="result")
+model = word2Vec.fit(df_words)
+df_word2vec = model.transform(df_words)
+
+# Show vectorized results (Word2Vec embeddings)
+df_word2vec.select("employer_name", "result").show()
+
+# Step 3: Calculate Cosine Similarity between Word2Vec vectors
+from pyspark.ml.linalg import Vectors
+
+def cosine_similarity(v1, v2):
+    return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
+
+# Create a UDF for cosine similarity
+cosine_udf = F.udf(cosine_similarity, returnType=F.FloatType())
+
+# Cross join to compare all pairs
+df_cross = df_word2vec.alias('df1').crossJoin(df_word2vec.alias('df2'))
+
+# Calculate cosine similarity
+df_similarity = df_cross.withColumn(
+    "cosine_similarity",
+    cosine_udf(F.col("df1.result"), F.col("df2.result"))
+)
+
+# Show the result
+df_similarity.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
+
+
+############
 from pyspark.sql import functions as F
 from pyspark.ml.feature import Tokenizer, HashingTF, IDF
 from pyspark.ml.linalg import Vectors
