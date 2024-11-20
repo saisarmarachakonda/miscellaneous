@@ -1,7 +1,10 @@
 
+# Ensure the column is of string type
+df = df.withColumn("employer_name", df["employer_name"].cast("string"))
+
 # Tokenize employer names into words
 tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
-df = tokenizer.transform(df)
+df_tokenized = tokenizer.transform(df)  # Transforming the DataFrame
 
 # Define a function to calculate Jaccard similarity between two lists
 def jaccard_similarity(list1, list2):
@@ -16,7 +19,7 @@ def jaccard_similarity(list1, list2):
 jaccard_udf = udf(jaccard_similarity, DoubleType())
 
 # Create a self-join to compare all employer names with each other
-df_with_similarity = df.alias("df1").crossJoin(df.alias("df2"))
+df_with_similarity = df_tokenized.alias("df1").crossJoin(df_tokenized.alias("df2"))
 
 # Apply Jaccard similarity UDF on pairs of employer names
 similarity_df = df_with_similarity.withColumn(
