@@ -1,4 +1,44 @@
+from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, edit_distance
 
+# Initialize Spark session
+spark = SparkSession.builder \
+    .appName("Edit Distance Example") \
+    .getOrCreate()
+
+# Sample data (replace this with your actual data)
+data = [
+    ("Company A", "Company A"),
+    ("Company B", "Comapny B"),
+    ("Company C", "Compny C"),
+    ("Company D", "Cmpany D"),
+]
+
+# Create DataFrame
+columns = ["employer_name_A", "employer_name_B"]
+df = spark.createDataFrame(data, columns)
+
+# Sample column for similarity (replace this with your actual similarity data)
+df = df.withColumn("similarity", col("employer_name_A").rlike("Company"))
+
+# Filter based on Edit Distance (less than 3 operations)
+filtered_similar_pairs = df.filter(
+    (col("similarity") > 0.8) & 
+    (edit_distance(col("employer_name_A"), col("employer_name_B")) < 3)
+)
+
+# Show the results
+filtered_similar_pairs.select(
+    col("employer_name_A").alias("Name1"),
+    col("employer_name_B").alias("Name2"),
+    col("similarity")
+).show(truncate=False)
+
+# Stop Spark session
+spark.stop()
+
+
+################
 # Ensure the column is of string type
 df = df.withColumn("employer_name", df["employer_name"].cast("string"))
 
