@@ -87,22 +87,29 @@ df_similarity = df_cross.withColumn(
     F.levenshtein(F.col("df1.employer_name"), F.col("df2.employer_name"))
 )
 
-# Step 3: Filter employer names based on similarity threshold
-threshold = 3  # Set your desired threshold (lower value means more similar)
+# Step 3: Calculate similarity score as 1 / (1 + levenshtein_distance)
+df_similarity = df_similarity.withColumn(
+    "similarity_score", 
+    1 / (1 + F.col("levenshtein_distance"))
+)
+
+# Step 4: Filter employer names based on similarity score threshold (e.g., similarity > 0.8)
+threshold = 0.8  # Set your desired threshold for similarity score
 df_similar = df_similarity.filter(
-    (F.col("levenshtein_distance") <= threshold) & 
+    (F.col("similarity_score") >= threshold) & 
     (F.col("df1.employer_name") != F.col("df2.employer_name"))
 )
 
-# Step 4: Select and rename columns for output (show only name1, name2, and levenshtein_distance)
+# Step 5: Select and rename columns for output (show only name1, name2, and similarity_score)
 df_final = df_similar.select(
     F.col("df1.employer_name").alias("name1"),
     F.col("df2.employer_name").alias("name2"),
-    "levenshtein_distance"
+    "similarity_score"
 )
 
-# Show the filtered similar names with their Levenshtein distance
+# Show the filtered similar names with their similarity score
 df_final.show(truncate=False)
+
 
 
 
