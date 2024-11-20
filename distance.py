@@ -65,9 +65,6 @@ df_final.show(truncate=False)
 
 ############
 from pyspark.sql import functions as F
-from pyspark.ml.feature import Tokenizer, HashingTF, IDF
-from pyspark.ml.linalg import Vectors
-from pyspark.sql.types import FloatType
 
 # Sample DataFrame
 data = [
@@ -81,41 +78,31 @@ columns = ["employer_name"]
 
 df = spark.createDataFrame(data, columns)
 
-# Step 1: Tokenize the employer_name column (splitting words)
-tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
-df_words = tokenizer.transform(df)
+# Step 1: Cross join to compare all pairs (including self-comparison for checking)
+df_cross = df.alias('df1').crossJoin(df.alias('df2'))
 
-# Step 2: HashingTF to get term frequency (TF) features
-hashing_tf = HashingTF(inputCol="words", outputCol="raw_features")
-df_tf = hashing_tf.transform(df_words)
-
-# Step 3: Apply IDF (Inverse Document Frequency) to get TF-IDF features
-idf = IDF(inputCol="raw_features", outputCol="features")
-idf_model = idf.fit(df_tf)
-df_tfidf = idf_model.transform(df_tf)
-
-# Step 4: Compute Cosine Similarity
-from pyspark.ml.linalg import Vectors
-
-# Define cosine similarity function
-def cosine_similarity(v1, v2):
-    return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
-
-# Create a UDF for cosine similarity
-cosine_udf = F.udf(cosine_similarity, returnType=FloatType())
-
-# Cross join to compare all pairs
-df_cross = df_tfidf.alias('df1').crossJoin(df_tfidf.alias('df2'))
-
-# Calculate cosine similarity between employer names
+# Step 2: Calculate Levenshtein distance between employer names
 df_similarity = df_cross.withColumn(
-    "cosine_similarity",
-    cosine_udf(F.col("df1.features"), F.col("df2.features"))
+    "levenshtein_distance", 
+    F.levenshtein(F.col("df1.employer_name"), F.col("df2.employer_name"))
 )
 
-# Show the result
-df_similarity.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
+# Step 3: Filter employer names based on similarity threshold
+threshold = 3  # Set your desired threshold (lower value means more similar)
+df_similar = df_similarity.filter(
+    (F.col("levenshtein_distance") <= threshold) & 
+    (F.col("df1.employer_name") != F.col("df2.employer_name"))
+)
 
+# Step 4: Select and rename columns for output (show only name1, name2, and levenshtein_distance)
+df_final = df_similar.select(
+    F.col("df1.employer_name").alias("name1"),
+    F.col("df2.employer_name").alias("name2"),
+    "levenshtein_distance"
+)
+
+# Show the filtered similar names with their Levenshtein distance
+df_final.show(truncate=False)
 
 
 
