@@ -2,7 +2,6 @@ from pyspark.sql import functions as F
 from pyspark.ml.feature import Tokenizer, Word2Vec
 from pyspark.ml.linalg import Vectors
 from pyspark.sql.types import FloatType
-from pyspark.ml.linalg import DenseVector
 
 # Sample DataFrame
 data = [
@@ -47,10 +46,21 @@ df_similarity = df_cross.withColumn(
 
 # Step 4: Filter employer names based on similarity threshold
 threshold = 0.85  # Set your desired threshold
-df_similar = df_similarity.filter((F.col("cosine_similarity") >= threshold) & (F.col("df1.employer_name") != F.col("df2.employer_name")))
+df_similar = df_similarity.filter(
+    (F.col("cosine_similarity") >= threshold) & 
+    (F.col("df1.employer_name") != F.col("df2.employer_name"))
+)
 
-# Show the similar employer names
-df_similar.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
+# Step 5: Select and rename columns for output
+df_final = df_similar.select(
+    F.col("df1.employer_name").alias("name1"),
+    F.col("df2.employer_name").alias("name2"),
+    "cosine_similarity"
+)
+
+# Show the filtered similar names with their similarity score
+df_final.show(truncate=False)
+
 
 
 ############
