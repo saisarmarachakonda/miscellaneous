@@ -1,41 +1,55 @@
-from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, edit_distance
+from pyspark.sql import functions as F
+from pyspark.ml.feature import Tokenizer, HashingTF, IDF
+from pyspark.ml.linalg import Vectors
+from pyspark.ml.stat import Summarizer
 
-# Initialize Spark session
-spark = SparkSession.builder \
-    .appName("Edit Distance Example") \
-    .getOrCreate()
-
-# Sample data (replace this with your actual data)
+# Sample DataFrame
 data = [
-    ("Company A", "Company A"),
-    ("Company B", "Comapny B"),
-    ("Company C", "Compny C"),
-    ("Company D", "Cmpany D"),
+    ("WALMART",),
+    ("WAL MART",),
+    ("Walmart",),
+    ("TARGET",),
+    ("TARGIT",)
 ]
+columns = ["employer_name"]
 
-# Create DataFrame
-columns = ["employer_name_A", "employer_name_B"]
 df = spark.createDataFrame(data, columns)
 
-# Sample column for similarity (replace this with your actual similarity data)
-df = df.withColumn("similarity", col("employer_name_A").rlike("Company"))
+# Step 1: Tokenize the employer_name column (splitting words)
+tokenizer = Tokenizer(inputCol="employer_name", outputCol="words")
+df_words = tokenizer.transform(df)
 
-# Filter based on Edit Distance (less than 3 operations)
-filtered_similar_pairs = df.filter(
-    (col("similarity") > 0.8) & 
-    (edit_distance(col("employer_name_A"), col("employer_name_B")) < 3)
+# Step 2: HashingTF to get term frequency (TF) features
+hashing_tf = HashingTF(inputCol="words", outputCol="raw_features")
+df_tf = hashing_tf.transform(df_words)
+
+# Step 3: Apply IDF (Inverse Document Frequency) to get TF-IDF features
+idf = IDF(inputCol="raw_features", outputCol="features")
+idf_model = idf.fit(df_tf)
+df_tfidf = idf_model.transform(df_tf)
+
+# Step 4: Compute Cosine Similarity
+from pyspark.ml.linalg import Vectors
+from pyspark.sql.functions import col
+
+def cosine_similarity(v1, v2):
+    return float(v1.dot(v2)) / (Vectors.norm(v1, 2) * Vectors.norm(v2, 2))
+
+# Create a UDF for cosine similarity
+cosine_udf = F.udf(cosine_similarity, returnType=F.FloatType())
+
+# Cross join to compare all pairs
+df_cross = df_tfidf.alias('df1').crossJoin(df_tfidf.alias('df2'))
+
+# Calculate cosine similarity between employer names
+df_similarity = df_cross.withColumn(
+    "cosine_similarity",
+    cosine_udf(F.col("df1.features"), F.col("df2.features"))
 )
 
-# Show the results
-filtered_similar_pairs.select(
-    col("employer_name_A").alias("Name1"),
-    col("employer_name_B").alias("Name2"),
-    col("similarity")
-).show(truncate=False)
+# Show the result
+df_similarity.select("df1.employer_name", "df2.employer_name", "cosine_similarity").show()
 
-# Stop Spark session
-spark.stop()
 
 
 ################
