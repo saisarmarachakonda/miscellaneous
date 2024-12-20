@@ -1,0 +1,22 @@
+threshold = 0.85
+groups = []
+
+# Dynamic group creation
+for _, row in data.iterrows():
+    added = False
+    for group in groups:
+        # Check if either name is already in the group
+        if row["Name 1"] in group or row["Name 2"] in group:
+            if row["Score"] >= threshold:
+                group.update([row["Name 1"], row["Name 2"]])
+                added = True
+                break
+    # If neither name was added to an existing group, create a new group
+    if not added and row["Score"] >= threshold:
+        groups.append(set([row["Name 1"], row["Name 2"]]))
+
+# Assign group IDs
+group_mapping = {name: idx + 1 for idx, group in enumerate(groups) for name in group}
+
+# Create a DataFrame for group assignments
+group_df = pd.DataFrame(group_mapping.items(), columns=["Name", "Group ID"])
