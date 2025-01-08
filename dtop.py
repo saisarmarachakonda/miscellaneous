@@ -1,3 +1,29 @@
+import nltk
+from nltk.corpus import wordnet
+
+# Ensure nltk resources are downloaded
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+def compare_phrases(phrase1, phrase2):
+    words1 = phrase1.split()
+    words2 = phrase2.split()
+    
+    # Compare word pairs
+    for word1 in words1:
+        for word2 in words2:
+            synonyms1 = set(lemma.name().lower() for syn in wordnet.synsets(word1) for lemma in syn.lemmas())
+            synonyms2 = set(lemma.name().lower() for syn in wordnet.synsets(word2) for lemma in syn.lemmas())
+            
+            if synonyms1 & synonyms2:
+                return f"The phrases '{phrase1}' and '{phrase2}' share synonyms between '{word1}' and '{word2}'."
+    
+    return f"The phrases '{phrase1}' and '{phrase2}' do not share synonyms."
+
+# Example Usage
+print(compare_phrases("fast river", "rapid stream"))
+
+
 unique_company_words = [
     "Analytics", "Biotechnology", "Sustainability", "Architectural", "Biosciences", 
     "Carriers", "Cloud", "Communications", "Construction", "Distributors", 
