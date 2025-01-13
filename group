@@ -1,3 +1,28 @@
+threshold = 0.8
+
+# Filter rows with score above the threshold
+filtered_df = latest[latest["score"] >= threshold]
+
+# Initialize empty groups
+groups = []
+
+# Dynamically create and merge groups using list comprehension
+[
+    groups.append(group) if not any(group & existing_group for existing_group in groups)
+    else next(existing_group.update(group) for existing_group in groups if group & existing_group)
+    for group in [set(pair) for pair in zip(filtered_df["employer_name_x"], filtered_df["employer_name_y"])]
+]
+
+# Assign group IDs
+group_mapping = {
+    name: idx + 1
+    for idx, group in enumerate(groups)
+    for name in group
+}
+
+print(group_mapping)
+
+
 threshold = 0.85
 groups = []
 
