@@ -6,76 +6,50 @@ unique_pairs = set(
 # Convert the set back to a DataFrame
 result_df = pd.DataFrame(list(unique_pairs), columns=['employer_name_x', 'employer_name_y'])
 
-
-def compute_vocabulary_features(
-    df: pd.DataFrame,
-    col1: str,
-    col2: str,
-    common_words: set[str] | None = None,
-) -> pd.DataFrame:
-    """Compute token-based features for comparison between two text columns.
-
+def compute_token_features(df: pd.DataFrame, col1: str, col2: str, common_words: Optional[Set[str]] = None) -> pd.DataFrame:
+    """
+    Compute token-based features for comparison between two text columns using list comprehensions.
+    
     Args:
         df: Input DataFrame containing text columns.
         col1: Name of the first text column to compare.
         col2: Name of the second text column to compare.
         common_words: Set of precomputed common words (optional).
-
+    
     Returns:
-        A DataFrame containing token-based features, including:
-        - common_hit: Count of common words present in both columns.
-        - rare_hit: Count of rare words present in both columns.
-        - common_miss: Count of common words present in only one column.
-        - rare_miss: Count of rare words present in only one column.
-        - n_overlap_words: Number of overlapping words between the two columns.
-        - ratio_overlap_words: Ratio of overlapping words to total unique words.
-        - num_word_difference: Absolute difference in the number of words between the two columns.
+        A DataFrame containing token-based features.
     """
-    assert common_words is None or isinstance(common_words, set)
-
-    name1 = df[col1]
-    name2 = df[col2]
-
-    # Tokenize words and convert to sets
-    word_set1 = name1.str.findall(r"\w\w+").map(set)
-    word_set2 = name2.str.findall(r"\w\w+").map(set)
-
-    # Compute hits and misses
-    hits = pd.Series(word_set1.values & word_set2.values, index=word_set1.index)
-    total_words = pd.Series(word_set1.values | word_set2.values, index=word_set1.index)
-    misses = total_words - hits
-
-    # Initialize word categories
+    # Default to an empty set if common_words is not provided
     common_words = common_words or set()
 
-    # Calculate feature counts using list comprehensions
-    common_hits = [sum(1 for word in hit if word in common_words) for hit in hits]
-    rare_hits = [sum(1 for word in hit if word not in common_words) for hit in hits]
+    # Tokenize text columns
+    tokens_col1 = [set(str(text).lower().split()) for text in df[col1]]
+    tokens_col2 = [set(str(text).lower().split()) for text in df[col2]]
 
-    common_misses = [sum(1 for word in miss if word in common_words) for miss in misses]
-    rare_misses = [sum(1 for word in miss if word not in common_words) for miss in misses]
+    # Compute features using list comprehensions
+    common_hit = [len(t1 & t2 & common_words) for t1, t2 in zip(tokens_col1, tokens_col2)]
+    rare_hit = [len(t1 & t2 - common_words) for t1, t2 in zip(tokens_col1, tokens_col2)]
+    common_miss = [len((t1 ^ t2) & common_words) for t1, t2 in zip(tokens_col1, tokens_col2)]
+    rare_miss = [len((t1 ^ t2) - common_words) for t1, t2 in zip(tokens_col1, tokens_col2)]
+    n_overlap_words = [len(t1 & t2) for t1, t2 in zip(tokens_col1, tokens_col2)]
+    ratio_overlap_words = [
+        len(t1 & t2) / len(t1 | t2) if len(t1 | t2) > 0 else 0
+        for t1, t2 in zip(tokens_col1, tokens_col2)
+    ]
+    num_word_difference = [abs(len(t1) - len(t2)) for t1, t2 in zip(tokens_col1, tokens_col2)]
 
-    # Compute summary statistics
-    n_hits = hits.map(len)
-    n_total = total_words.map(len)
-    n_set1 = word_set1.map(len)
-    n_set2 = word_set2.map(len)
-    ratio_overlap = (n_hits / n_total).replace(np.inf, 0)
+    # Create a DataFrame with the computed features
+    feature_df = pd.DataFrame({
+        'common_hit': common_hit,
+        'rare_hit': rare_hit,
+        'common_miss': common_miss,
+        'rare_miss': rare_miss,
+        'n_overlap_words': n_overlap_words,
+        'ratio_overlap_words': ratio_overlap_words,
+        'num_word_difference': num_word_difference,
+    })
 
-    # Create and return feature DataFrame
-    return pd.DataFrame(
-        {
-            "common_hit": common_hits,
-            "rare_hit": rare_hits,
-            "common_miss": common_misses,
-            "rare_miss": rare_misses,
-            "n_overlap_words": n_hits,
-            "ratio_overlap_words": ratio_overlap,
-            "num_word_difference": (n_set1 - n_set2).abs(),
-        },
-        dtype="float32",
-    )
-
+    return pd.concat([df, feature_df], axis=1)
 # Example usage
 if __name__ == "__main__":
     import pandas as pd
