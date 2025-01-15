@@ -1,3 +1,12 @@
+# Use a set to store unique pairs regardless of order
+unique_pairs = set(
+    tuple(sorted(pair)) for pair in zip(df['employer_name_x'], df['employer_name_y'])
+)
+
+# Convert the set back to a DataFrame
+result_df = pd.DataFrame(list(unique_pairs), columns=['employer_name_x', 'employer_name_y'])
+
+
 def compute_vocabulary_features(
     df: pd.DataFrame,
     col1: str,
