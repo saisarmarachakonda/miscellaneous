@@ -1,6 +1,33 @@
 import pandas as pd
-from rapidfuzz import fuzz, process
+from rapidfuzz import process, fuzz
 import re
+
+# Function to find matches using token_set_ratio
+def find_matches(input_string, comparison_list, threshold=80):
+    """
+    Finds matches from the comparison list for a given input string using token_set_ratio.
+
+    Parameters:
+    - input_string (str): The input string to match.
+    - comparison_list (list): List of names to compare against.
+    - threshold (int): Minimum similarity score (default = 80).
+
+    Returns:
+    - list: Matched names from the comparison list.
+    """
+    # Split input string by multiple delimiters
+    delimiters = r",|/|AND"
+    tokens = [name.strip() for name in re.split(delimiters, input_string) if name.strip()]
+
+    # Find matches using token_set_ratio
+    matches = list(
+        {
+            match[0]  # Extract the name from the comparison list
+            for token in tokens
+            for match in process.extract(token, comparison_list, scorer=fuzz.token_set_ratio, score_cutoff=threshold)
+        }
+    )
+    return matches
 
 # Example DataFrame
 data = {"employer_name": ["Google,Amazon/Microsoft", "goog", "Amazo AND Google"]}
@@ -9,31 +36,13 @@ df = pd.DataFrame(data)
 # List to compare against
 comparison_list = ["Google", "Amazon", "Facebook"]
 
-# Delimiters to split on
-delimiters = r",|/|AND"
-
-# Process each row using list comprehension
-results = [
-    {
-        "employer_name": row,
-        "matches_from_list": list(
-            {
-                match[0]  # Keep only the names from the comparison list
-                for name in re.split(delimiters, row) if name.strip()  # Split and skip empty names
-                for match in process.extract(name.strip(), comparison_list, scorer=fuzz.partial_ratio, score_cutoff=80)
-            }
-        )
-    }
-    for row in df["employer_name"]
+# Apply the find_matches function to the 'employer_name' column using list comprehension
+df["matches_from_list"] = [
+    find_matches(row, comparison_list) for row in df["employer_name"]
 ]
 
-# Convert the results back to a DataFrame
-final_df = pd.DataFrame(results)
-
-# Display the results
-print(final_df)
-
-
+# Display the DataFrame
+print(df)
 
 # Use a set to store unique pairs regardless of order
 unique_pairs = set(
