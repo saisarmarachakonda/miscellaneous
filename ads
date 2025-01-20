@@ -16,30 +16,22 @@ delimiters = r",|/|AND"
 results = [
     {
         "employer_name": row,
-        "all_matches": {
-            name.strip(): [
-                (match[0], match[1])  # Matched name and similarity score
+        "matches_from_list": list(
+            {
+                match[0]  # Keep only the names from the comparison list
+                for name in re.split(delimiters, row) if name.strip()  # Split and skip empty names
                 for match in process.extract(name.strip(), comparison_list, scorer=fuzz.partial_ratio, score_cutoff=80)
-            ]
-            for name in re.split(delimiters, row) if name.strip()  # Split and skip empty names
-        },
+            }
+        )
     }
     for row in df["employer_name"]
 ]
-
-# Flatten matches for easier viewing
-for result in results:
-    result["flat_matches"] = [
-        (key, match[0], match[1])
-        for key, values in result["all_matches"].items()
-        for match in values
-    ]
 
 # Convert the results back to a DataFrame
 final_df = pd.DataFrame(results)
 
 # Display the results
-print(final_df[["employer_name", "flat_matches"]])
+print(final_df)
 
 
 
