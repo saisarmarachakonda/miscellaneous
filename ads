@@ -35,6 +35,46 @@ print(df['matches_from_list'])
 
 
 
+-------------------------------------------------
+
+import pandas as pd
+import numpy as np
+from rapidfuzz import process, fuzz
+import re
+
+# Example DataFrame with large data
+data = {"employer_name": ["Google,Amazon/Microsoft", "goog", "Amazo AND Google", "Facebook/Apple", "Amazon/Google"]}
+df = pd.DataFrame(data)
+
+# List to compare against
+comparison_list = ["Google", "Amazon", "Facebook"]
+
+# Step 1: Split the 'employer_name' column into tokens based on delimiters using vectorized Pandas string operations
+delimiters = r",|/|AND"
+
+# Vectorized operation to split employer names into tokens
+tokens_list = df['employer_name'].str.split(delimiters).apply(lambda x: [name.strip() for name in x if name.strip()])
+
+# Step 2: Fuzzy matching using list comprehension (vectorized approach)
+matches_list = [
+    list(set(
+        match[0] for token in tokens 
+        for match in process.extract(token, comparison_list, scorer=fuzz.token_set_ratio, score_cutoff=80)
+    )) 
+    for tokens in tokens_list
+]
+
+# Step 3: Add the matches as a new column in the DataFrame
+df['matches_from_list'] = matches_list
+
+# Step 4: Return only the 'matches_from_list' column
+print(df['matches_from_list'])
+
+
+
+
+-------------------------------------------------
+
 
 
 
