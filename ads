@@ -3,36 +3,43 @@ from rapidfuzz import fuzz, process
 import re
 
 # Example DataFrame
-data = {
-    "employer_name": ["Google,Amazon/Microsoft", "goog", "Amazo AND Google"]
-}
+data = {"employer_name": ["Google,Amazon/Microsoft", "goog", "Amazo AND Google"]}
 df = pd.DataFrame(data)
 
 # List to compare against
 comparison_list = ["Google", "Amazon", "Facebook"]
 
-# Function to compute all matches with multiple delimiters
-def find_all_matches(value, comparison_list, threshold=80):
-    # Use regex to split by multiple delimiters
-    names = re.split(r",|/|AND", value)
-    return {
-        name.strip(): [
-            (match[0], match[1])  # Extract matched name and score
-            for match in process.extract(name.strip(), comparison_list, scorer=fuzz.partial_ratio, score_cutoff=threshold)
-        ]
-        for name in names if name.strip()  # Skip empty names
+# Delimiters to split on
+delimiters = r",|/|AND"
+
+# Process each row using list comprehension
+results = [
+    {
+        "employer_name": row,
+        "all_matches": {
+            name.strip(): [
+                (match[0], match[1])  # Matched name and similarity score
+                for match in process.extract(name.strip(), comparison_list, scorer=fuzz.partial_ratio, score_cutoff=80)
+            ]
+            for name in re.split(delimiters, row) if name.strip()  # Split and skip empty names
+        },
     }
+    for row in df["employer_name"]
+]
 
-# Apply the function to the column
-df["all_matches"] = df["employer_name"].apply(lambda x: find_all_matches(x, comparison_list))
+# Flatten matches for easier viewing
+for result in results:
+    result["flat_matches"] = [
+        (key, match[0], match[1])
+        for key, values in result["all_matches"].items()
+        for match in values
+    ]
 
-# Flatten the results into a simple list (optional)
-df["flat_matches"] = df["all_matches"].apply(
-    lambda matches: [(key, match[0], match[1]) for key, values in matches.items() for match in values]
-)
+# Convert the results back to a DataFrame
+final_df = pd.DataFrame(results)
 
 # Display the results
-print(df[["employer_name", "flat_matches"]])
+print(final_df[["employer_name", "flat_matches"]])
 
 
 
