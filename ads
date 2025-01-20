@@ -1,3 +1,36 @@
+import pandas as pd
+from rapidfuzz import fuzz, process
+
+# Example DataFrame
+data = {
+    "employer_name": ["Google,Amazon,Microsoft", "goog", "Amazo, Google"]
+}
+df = pd.DataFrame(data)
+
+# List to compare against
+comparison_list = ["Google", "Amazon", "Facebook"]
+
+# Function to compute all matches
+def find_all_matches(value, comparison_list, threshold=50):
+    # Split by delimiter (comma or other separators)
+    names = [name.strip() for name in value.split(",")]
+    
+    # Store all matches for each name
+    all_matches = {}
+    for name in names:
+        matches = process.extract(name, comparison_list, scorer=fuzz.partial_ratio, score_cutoff=threshold)
+        all_matches[name] = matches
+    return all_matches
+
+# Apply the function to the column
+df["all_matches"] = df["employer_name"].apply(lambda x: find_all_matches(x, comparison_list))
+
+# Display the results
+print(df[["employer_name", "all_matches"]])
+
+
+
+
 # Use a set to store unique pairs regardless of order
 unique_pairs = set(
     tuple(sorted(pair)) for pair in zip(df['employer_name_x'], df['employer_name_y'])
