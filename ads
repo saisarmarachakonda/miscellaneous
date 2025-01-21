@@ -3,7 +3,111 @@ import pandas as pd
 import recordlinkage
 
 # Sample data
+data = {import pandas as pd
+from collections import defaultdict
+
+# Sample data
 data = {
+    'id': [1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 7],
+    'employer_name': [
+        "COSTEX TRACTOR PART", "ABC CORP", 
+        "C&J TECH", "C & J TECH", "C & J", 
+        "BLA", "BLABLA", 
+        "ABC CORP", "COSTEX TRACTOR PART", "BLABLA",
+        "COSTEX TRACTOR PART", "XYZ INC", "ABC CORP",
+        "COSTEX", "DEF", 
+        "C&J TECH", "C & J TECH",
+        "C J TECH", "C & J TECH", "C & J TECH"
+    ]
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Function to count pairs of employer names and individual counts
+def count_pairs_and_individual_counts(df):
+    pair_counts = defaultdict(int)
+    individual_counts = defaultdict(int)
+    
+    # Iterate through each 'id' and get all unique pairs of employer names
+    for _, group in df.groupby('id'):
+        employers = group['employer_name'].tolist()
+        
+        # Count individual occurrences
+        for employer in employers:
+            individual_counts[employer] += 1
+
+        # Count pairs
+        for i in range(len(employers)):
+            for j in range(i + 1, len(employers)):
+                pair = tuple(sorted([employers[i], employers[j]]))  # Sort to avoid order-sensitive pairs
+                pair_counts[pair] += 1
+    
+    return pair_counts, individual_counts
+
+# Count pairs and individual counts
+pair_counts, individual_counts = count_pairs_and_individual_counts(df)
+
+# Filter employers with total occurrences > 3
+filtered_employers = {employer for employer, count in individual_counts.items() if count > 3}
+
+# Display the filtered individual counts
+print("Filtered Employers (Total Individual Counts > 3):")
+filtered_individual_counts = {k: v for k, v in individual_counts.items() if v > 3}
+print(filtered_individual_counts)
+
+# Union-Find (Disjoint Set Union - DSU) to group connected employers
+class UnionFind:
+    def __init__(self, elements):
+        self.parent = {e: e for e in elements}
+        self.rank = {e: 0 for e in elements}
+
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])  # Path compression
+        return self.parent[x]
+
+    def union(self, x, y):
+        rootX = self.find(x)
+        rootY = self.find(y)
+
+        if rootX != rootY:
+            if self.rank[rootX] > self.rank[rootY]:
+                self.parent[rootY] = rootX
+            elif self.rank[rootX] < self.rank[rootY]:
+                self.parent[rootX] = rootY
+            else:
+                self.parent[rootY] = rootX
+                self.rank[rootX] += 1
+
+# Initialize UnionFind for the filtered employer names
+uf = UnionFind(filtered_employers)
+
+# Union employers that share a pair
+for pair, count in pair_counts.items():
+    employer1, employer2 = pair
+    if employer1 in filtered_employers and employer2 in filtered_employers:
+        uf.union(employer1, employer2)
+
+# Group filtered employers based on their connected components
+groups = defaultdict(list)
+for employer in filtered_employers:
+    root = uf.find(employer)
+    groups[root].append(employer)
+
+# Final result: List of connected groups of employer names
+final_groups = list(groups.values())
+
+# Show the final grouped result
+print("\nFinal Employer Groups (Filtered by Count > 3):")
+print(final_groups)
+
+
+
+
+
+
+
     "ID": [1, 2, 3, 4, 5, 6],
     "identity_id": ["A1", "A2", "A3", "B1", "B2", "C1"],
     "Employer Name": ["Google LLC", "Google Inc.", "Google", "Amazon", "Amazon.com", "Microsoft"],
