@@ -1,3 +1,259 @@
+
+import pandas as pd
+import recordlinkage
+
+# Sample data
+data = {
+    "ID": [1, 2, 3, 4, 5, 6],
+    "identity_id": ["A1", "A2", "A3", "B1", "B2", "C1"],
+    "Employer Name": ["Google LLC", "Google Inc.", "Google", "Amazon", "Amazon.com", "Microsoft"],
+    "State": ["CA", "CA", "CA", "NY", "NY", "WA"],
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Indexing: Generate potential pairs with blocking on 'State'
+indexer = recordlinkage.Index()
+indexer.block("State")  # Compare only pairs within the same state
+candidate_links = indexer.index(df, df)
+
+# Comparison: Define similarity rules
+compare = recordlinkage.Compare()
+compare.string("Employer Name", "Employer Name", method="levenshtein", threshold=0.8, label="name_similarity")
+compare.exact("State", "State", label="state_match")  # Ensure the state matches
+compare.exact("identity_id", "identity_id", label="identity_id_match")  # Exact match for identity_id
+
+# Compute similarity scores
+features = compare.compute(candidate_links, df)
+
+# Filter: Retain pairs with high similarity
+matches = features[(features["name_similarity"] == 1) & (features["state_match"] == 1)].reset_index()
+
+# Map IDs and additional columns from original data
+matches = matches.merge(df[["ID", "identity_id"]].rename(columns={"ID": "ID_1", "identity_id": "identity_id_1"}), left_on="level_0", right_index=True)
+matches = matches.merge(df[["ID", "identity_id"]].rename(columns={"ID": "ID_2", "identity_id": "identity_id_2"}), left_on="level_1", right_index=True)
+
+# Add Cluster IDs
+matches["Cluster ID"] = matches.index + 1  # Assign unique cluster IDs
+
+# Final output
+print(matches[["ID_1", "identity_id_1", "ID_2", "identity_id_2", "Cluster ID"]])
+
+
+
+
+
+import pandas as pd
+from scipy.cluster.hierarchy import dendrogram, linkage
+from sklearn.cluster import AgglomerativeClustering
+import matplotlib.pyplot as plt
+
+# Sample data
+data = {
+    "Employer Name 1": ["Employer A", "Employer B", "Employer C", "Employer D"],
+    "Employer Name 2": ["Employer B", "Employer C", "Employer D", "Employer A"],
+    "Similarity Score": [0.9, 0.85, 0.7, 0.95],
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Create a similarity matrix
+names = list(set(df["Employer Name 1"]).union(set(df["Employer Name 2"])))
+similarity_matrix = pd.DataFrame(0, index=names, columns=names)
+
+for _, row in df.iterrows():
+    similarity_matrix.loc[row["Employer Name 1"], row["Employer Name 2"]] = row["Similarity Score"]
+    similarity_matrix.loc[row["Employer Name 2"], row["Employer Name 1"]] = row["Similarity Score"]
+
+# Convert similarity to distance (1 - similarity)
+distance_matrix = 1 - similarity_matrix.values
+
+# Apply Agglomerative Clustering
+n_clusters = 2  # Set the number of clusters (can be adjusted)
+agg_cluster = AgglomerativeClustering(n_clusters=n_clusters, affinity="precomputed", linkage="average")
+cluster_labels = agg_cluster.fit_predict(distance_matrix)
+
+# Map clusters back to employer names
+cluster_mapping = dict(zip(names, cluster_labels))
+
+# Add Cluster IDs to the DataFrame
+df["Cluster ID 1"] = df["Employer Name 1"].map(cluster_mapping)
+df["Cluster ID 2"] = df["Employer Name 2"].map(cluster_mapping)
+
+# Visualize Dendrogram
+linked = linkage(distance_matrix, method="average")
+plt.figure(figsize=(8, 4))
+dendrogram(linked, labels=names, orientation="top", distance_sort="descending", show_leaf_counts=True)
+plt.title("Dendrogram")
+plt.show()
+
+print(df)
+
+
+
+
+
+
+
+
+import pandas as pd
+import numpy as np
+from sklearn.cluster import DBSCAN
+
+# Sample data
+data = {
+    "Employer Name 1": ["Employer A", "Employer B", "Employer C", "Employer D"],
+    "Employer Name 2": ["Employer B", "Employer C", "Employer D", "Employer A"],
+    "Similarity Score": [0.9, 0.85, 0.7, 0.95],
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Prepare a similarity matrix
+names = list(set(df["Employer Name 1"]).union(set(df["Employer Name 2"])))
+similarity_matrix = pd.DataFrame(0, index=names, columns=names)
+
+for _, row in df.iterrows():
+    similarity_matrix.loc[row["Employer Name 1"], row["Employer Name 2"]] = row["Similarity Score"]
+    similarity_matrix.loc[row["Employer Name 2"], row["Employer Name 1"]] = row["Similarity Score"]
+
+# Convert similarity to distance (1 - similarity)
+distance_matrix = 1 - similarity_matrix.values
+
+# Apply DBSCAN
+epsilon = 0.3  # Maximum distance for clusters (equivalent to similarity of 0.7)
+min_samples = 1  # Minimum points to form a cluster
+dbscan = DBSCAN(eps=epsilon, min_samples=min_samples, metric="precomputed")
+clusters = dbscan.fit_predict(distance_matrix)
+
+# Map clusters back to employer names
+cluster_mapping = dict(zip(names, clusters))
+
+# Assign Cluster IDs to the DataFrame
+df["Cluster ID 1"] = df["Employer Name 1"].map(cluster_mapping)
+df["Cluster ID 2"] = df["Employer Name 2"].map(cluster_mapping)
+
+print(df)
+
+
+
+
+
+
+import pandas as pd
+from scipy.cluster.hierarchy import linkage, fcluster
+from scipy.spatial.distance import squareform
+
+# Sample data
+data = {
+    "Employer Name 1": ["Employer A", "Employer B", "Employer C", "Employer D"],
+    "Employer Name 2": ["Employer B", "Employer C", "Employer D", "Employer A"],
+    "Similarity Score": [0.9, 0.85, 0.7, 0.95],
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Create a similarity matrix
+names = list(set(df["Employer Name 1"]).union(set(df["Employer Name 2"])))
+similarity_matrix = pd.DataFrame(0, index=names, columns=names)
+
+for _, row in df.iterrows():
+    similarity_matrix.loc[row["Employer Name 1"], row["Employer Name 2"]] = row["Similarity Score"]
+    similarity_matrix.loc[row["Employer Name 2"], row["Employer Name 1"]] = row["Similarity Score"]
+
+# Convert similarity to distance (1 - similarity)
+distance_matrix = 1 - similarity_matrix
+
+# Perform hierarchical clustering
+linkage_matrix = linkage(squareform(distance_matrix), method="average")
+threshold = 0.3  # Distance threshold (equivalent to a similarity of 0.7)
+clusters = fcluster(linkage_matrix, threshold, criterion="distance")
+
+# Map clusters back to employers
+cluster_mapping = dict(zip(names, clusters))
+
+# Add Cluster IDs to the DataFrame
+df["Cluster ID 1"] = df["Employer Name 1"].map(cluster_mapping)
+df["Cluster ID 2"] = df["Employer Name 2"].map(cluster_mapping)
+
+print(df)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+import networkx as nx
+
+# Sample data
+data = {
+    "Employer Name 1": ["Employer A", "Employer B", "Employer C", "Employer D"],
+    "Employer Name 2": ["Employer B", "Employer C", "Employer D", "Employer A"],
+    "Similarity Score": [0.9, 0.85, 0.7, 0.95],
+}
+
+# Convert to DataFrame
+df = pd.DataFrame(data)
+
+# Create a graph
+threshold = 0.8  # Define the similarity threshold
+G = nx.Graph()
+
+# Add edges for pairs above the threshold
+for _, row in df.iterrows():
+    if row["Similarity Score"] >= threshold:
+        G.add_edge(row["Employer Name 1"], row["Employer Name 2"])
+
+# Find connected components (clusters)
+clusters = list(nx.connected_components(G))
+
+# Assign Cluster IDs
+cluster_mapping = {}
+for cluster_id, cluster in enumerate(clusters):
+    for employer in cluster:
+        cluster_mapping[employer] = cluster_id
+
+# Add Cluster ID to the DataFrame
+df["Cluster ID 1"] = df["Employer Name 1"].map(cluster_mapping)
+df["Cluster ID 2"] = df["Employer Name 2"].map(cluster_mapping)
+
+print(df)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import pandas as pd
 import numpy as np
 from rapidfuzz import process, fuzz
