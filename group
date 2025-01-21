@@ -1,3 +1,49 @@
+
+# Generate all unique pairs from each row
+pair_counts = Counter()
+for group in df['employer_name']:
+    for pair in combinations(sorted(set(group)), 2):  # Ensure pairs are unique and ordered
+        pair_counts[pair] += 1
+
+# Filter pairs that appear more than once
+repeated_pairs = [pair for pair, count in pair_counts.items() if count > 1]
+
+# Union-Find (Disjoint Set) implementation to group connected names
+parent = {}
+
+def find(x):
+    if parent[x] != x:
+        parent[x] = find(parent[x])
+    return parent[x]
+
+def union(x, y):
+    root_x = find(x)
+    root_y = find(y)
+    if root_x != root_y:
+        parent[root_y] = root_x
+
+# Initialize parent for each unique name
+all_names = set([name for pair in repeated_pairs for name in pair])
+for name in all_names:
+    parent[name] = name
+
+# Union pairs
+for name1, name2 in repeated_pairs:
+    union(name1, name2)
+
+# Group names by their root parent
+groups = defaultdict(list)
+for name in all_names:
+    root = find(name)
+    groups[root].append(name)
+
+# Convert to list of groups
+grouped_repeated_names = list(groups.values())
+
+
+
+
+
 threshold = 0.8
 
 # Filter rows with score above the threshold
