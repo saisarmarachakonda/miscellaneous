@@ -1,0 +1,98 @@
+import pandas as pd
+from collections import defaultdict
+
+# Sample data
+data = {
+    'id': [1, 1, 2, 2, 2, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 7, 7, 8, 8, 7],
+    'employer_name': [
+        "COSTEX TRACTOR PART", "ABC CORP", 
+        "C&J TECH", "C & J TECH", "C & J", 
+        "BLA", "BLABLA", 
+        "ABC CORP", "COSTEX TRACTOR PART", "BLABLA",
+        "COSTEX TRACTOR PART", "XYZ INC", "ABC CORP",
+        "COSTEX", "DEF", 
+        "C&J TECH", "C & J TECH",
+        "C J TECH", "C & J TECH", "C & J TECH"
+    ]
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Function to count pairs of employer names and individual counts per id
+def count_pairs_and_individual_counts(df):
+    pair_counts = defaultdict(int)
+    individual_counts_per_id = defaultdict(lambda: defaultdict(int))
+    
+    # Iterate through each 'id' and get all unique pairs of employer names
+    for _, group in df.groupby('id'):
+        employers = group['employer_name'].tolist()
+        
+        # Count individual occurrences within each 'id'
+        for employer in employers:
+            individual_counts_per_id[group['id'].iloc[0]][employer] += 1  # count within the group
+
+        # Count pairs
+        for i in range(len(employers)):
+            for j in range(i + 1, len(employers)):
+                pair = tuple(sorted([employers[i], employers[j]]))  # Sort to avoid order-sensitive pairs
+                pair_counts[pair] += 1  # Count pair occurrences
+    
+    return pair_counts, individual_counts_per_id
+
+# Union-Find (Disjoint Set Union - DSU) to group connected employers
+class UnionFind:
+    def __init__(self, elements):
+        self.parent = {e: e for e in elements}
+        self.rank = {e: 0 for e in elements}
+
+    def find(self, x):
+        if self.parent[x] != x:
+            self.parent[x] = self.find(self.parent[x])  # Path compression
+        return self.parent[x]
+
+    def union(self, x, y):
+        rootX = self.find(x)
+        rootY = self.find(y)
+
+        if rootX != rootY:
+            if self.rank[rootX] > self.rank[rootY]:
+                self.parent[rootY] = rootX
+            elif self.rank[rootX] < self.rank[rootY]:
+                self.parent[rootX] = rootY
+            else:
+                self.parent[rootY] = rootX
+                self.rank[rootX] += 1
+
+# Count pairs and get individual counts per id
+pair_counts, individual_counts_per_id = count_pairs_and_individual_counts(df)
+
+
+# Threshold for significant ratio
+threshold = 0.1  # You can adjust this threshold based on your needs
+
+# Initialize UnionFind for all unique employer names
+unique_employers = set(df['employer_name'])
+uf = UnionFind(unique_employers)
+
+# Union employers that share a pair with a significant ratio
+for pair, count in pair_counts.items():
+    employer1, employer2 = pair
+    ratio1 = count / individual_counts_per_id[1].get(employer1, 1)  # Using any id (e.g., 1) to get individual count
+    ratio2 = count / individual_counts_per_id[1].get(employer2, 1)
+    # If the ratio exceeds the threshold, union the employers
+    if ratio1 > threshold and ratio2 > threshold:
+        uf.union(employer1, employer2)
+
+# Group employers based on their connected components
+groups = defaultdict(list)
+for employer in unique_employers:
+    root = uf.find(employer)
+    groups[root].append(employer)
+
+# Final result: List of connected groups of employer names
+final_groups = list(groups.values())
+
+# Show the final grouped result
+print("\nFinal Employer Groups:")
+print(final_groups)
