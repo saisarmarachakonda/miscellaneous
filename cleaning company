@@ -1,0 +1,97 @@
+import re
+import unicodedata
+
+tail_removal_rexp = re.compile(r"[^\.\w]+$", flags=re.UNICODE)
+
+
+def get_unique_terms():
+    "retrieve all unique terms from termdata definitions"
+    return set(
+        [term for sublist in terms_by_type.values() for term in sublist] +
+        [term for sublist in terms_by_country.values() for term in sublist]
+    )
+
+
+def remove_accents(t):
+    """based on https://stackoverflow.com/a/51230541"""
+    nfkd_form = unicodedata.normalize('NFKD', t.casefold())
+    return ''.join(
+        NON_NFKD_MAP[c] if c in NON_NFKD_MAP else c
+        for part in nfkd_form for c in part
+        if unicodedata.category(part) != 'Mn'
+    )
+
+
+def strip_punct(t):
+    return t.replace(".", "").replace(",", "").replace("-", "")
+
+
+def normalize_terms(terms):
+    "normalize terms using list comprehension"
+    return [strip_punct(remove_accents(t)) for t in terms]
+
+
+def strip_tail(name):
+    "get rid of all trailing non-letter symbols except the dot"
+    match = re.search(tail_removal_rexp, name)
+    return name[:match.span()[0]] if match else name
+
+
+def normalized(text):
+    "caseless Unicode normalization"
+    return remove_accents(text)
+
+
+def prepare_default_terms():
+    "construct an optimized term structure for basename extraction"
+    terms = get_unique_terms()
+    nterms = normalize_terms(terms)
+    ntermparts = [t.split() for t in nterms]  # List comprehension for splitting terms
+    # sort terms descending by number of tokens, ascending by names
+    return [(len(tp), tp) for tp in sorted(ntermparts, key=lambda x: (-len(x), x))]
+
+
+def custom_basename(name, terms, suffix=True, prefix=False, middle=False, **kwargs):
+    "return cleaned base version of the business name"
+
+    name = strip_tail(name)
+    nparts = name.split()
+    nname = normalized(name)
+    nnparts = [strip_punct(part) for part in nname.split()]  # List comprehension for punctuation stripping
+    nnsize = len(nnparts)
+
+    # Handle suffix removal using list comprehension
+    if suffix:
+        matching_suffixes = [
+            (nnparts[:len(nnparts) - termsize], nparts[:len(nparts) - termsize])
+            for termsize, termparts in terms if nnparts[-termsize:] == termparts
+        ]
+        if matching_suffixes:
+            nnparts, nparts = matching_suffixes[0]
+
+    # Handle prefix removal using list comprehension
+    if prefix:
+        matching_prefixes = [
+            (nnparts[termsize:], nparts[termsize:])
+            for termsize, termparts in terms if nnparts[:termsize] == termparts
+        ]
+        if matching_prefixes:
+            nnparts, nparts = matching_prefixes[0]
+
+    # Handle middle term removal using list comprehension
+    if middle:
+        matching_middles = [
+            (nnparts[:i] + nnparts[i + termsize:], nparts[:i] + nparts[i + termsize:])
+            for termsize, termparts in terms for i in range(0, nnsize - termsize + 1)
+            if termparts == nnparts[i:i + termsize]
+        ]
+        if matching_middles:
+            nnparts, nparts = matching_middles[0]
+
+    return strip_tail(" ".join(nparts))
+
+
+# Example usage without functools.partial
+terms = prepare_default_terms()  # You can call this whenever you need the terms
+name = "Daddy & Sons, Ltd."
+cleaned_name = custom_basename(name, terms=terms, suffix=True, prefix=True, middle=True)
