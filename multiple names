@@ -1,5 +1,40 @@
 import pandas as pd
 from rapidfuzz import fuzz
+
+# Sample data
+data = {'company_name': ['MC DONALDS1234 ABC 123', 'ABC 123 SOLUTIONS', 'XYZ TECH99', 'HELLO-WORLD! XYZ TECH', '$123abc!']}
+df = pd.DataFrame(data)
+
+# List of employer names
+employer_names = ["MCDONALDS", "ABC 123", "XYZ TECHNOLOGIES", "HELLO WORLD", "$123abc123"]
+
+# Function to find matched substrings and return them as a list of lists using RapidFuzz and list comprehension
+def find_matched_substrings_as_lists_rapidfuzz(df, employer_names, threshold=75):
+    return [
+        [
+            token
+            for token in company_name.split()
+            if any(fuzz.ratio(token, employer) >= threshold for employer in employer_names)
+        ] + [
+            ' '.join(company_name.split()[i:i+2])
+            for i in range(len(company_name.split()) - 1)
+            if any(fuzz.ratio(' '.join(company_name.split()[i:i+2]), employer) >= threshold for employer in employer_names)
+        ]
+        for company_name in df['company_name']
+        if any(fuzz.ratio(token, employer) >= threshold for token in company_name.split() for employer in employer_names) or
+           any(fuzz.ratio(' '.join(company_name.split()[i:i+2]), employer) >= threshold for i in range(len(company_name.split()) - 1) for employer in employer_names)
+    ]
+
+# Get the list of matched substrings as lists using RapidFuzz
+final_matched_lists = find_matched_substrings_as_lists_rapidfuzz(df, employer_names)
+
+# Display the list of lists
+print(final_matched_lists)
+
+
+
+import pandas as pd
+from rapidfuzz import fuzz
 import re
 
 def preprocess_for_matching(text):
