@@ -1,4 +1,60 @@
 import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import re
+
+# Sample DataFrame
+data = {'text': ["Infosys123, IBM", "Worked at Google and Accenture", "Wipro and IBM"]}
+df = pd.DataFrame(data)
+
+# Employer names to match
+employer_set = {"Infosys", "IBM", "Google", "Wipro", "Tata Consultancy", "Accenture"}
+
+# Similarity threshold
+threshold = 80
+
+# Create a TfidfVectorizer with character-based n-grams of size 2
+vectorizer = TfidfVectorizer(analyzer='char', ngram_range=(2, 2))
+
+# Fit the vectorizer on the employer names
+employer_ngrams = vectorizer.fit_transform(employer_set)
+
+# Function to compute matches for each text in the DataFrame
+def extract_matches(text):
+    # Transform the input text into the same n-gram space
+    text_ngrams = vectorizer.transform([text])
+
+    # Compute cosine similarities between the input text and the employer names
+    cosine_similarities = cosine_similarity(text_ngrams, employer_ngrams).flatten()
+
+    # Extract matches with thresholding
+    matches = [
+        (list(employer_set)[idx], score * 100)
+        for idx, score in enumerate(cosine_similarities)
+        if score * 100 >= 0
+    ]
+    
+    # Extract matched substrings (including numbers attached to the employer names)
+    matched_substrings = [
+        re.search(re.escape(match) + r'\w*', text).group()
+        for match, score in matches if re.search(re.escape(match) + r'\w*', text)
+    ]
+    
+    return matches, matched_substrings
+
+# Apply the function to each row in the DataFrame
+df['matches'], df['matched_substrings'] = zip(*df['text'].apply(extract_matches))
+
+
+df
+
+
+
+
+
+
+
+import pandas as pd
 import re
 from rapidfuzz import fuzz
 
