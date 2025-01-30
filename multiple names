@@ -30,17 +30,21 @@ def find_best_substring_match(original_text, sub_name, employer_names):
     return None
 
 # Sample DataFrame
-data = {'company_name': ['MC DONALDS1234 ABC 123', 'ABC 123 SOLUTIONS', 'XYZ TECH99', 'HELLO-WORLD! XYZ TECH', '$123abc!']}
+data = {'company_name': ['MCDONALDS, ABC 123', 'ABC 123 SOLUTIONS', 'XYZ TECH99', 'HELLO-WORLD! XYZ TECH', '$123abc!']}
 df = pd.DataFrame(data)
 
 # List of employer names
-employer_names = ["MCDONALDS", "ABC 123", "XYZ TECHNOLOGIES", "HELLO WORLD", "$123abc123"]
+employer_names = ["MCDONALDS", "ABC-123 SERVICES", "XYZ TECHNOLOGIES", "HELLO WORLD", "$123abc123"]
 
 # Vectorized function to extract matching substrings for each company name
-df['matched_substrings'] = df['company_name'].apply(
-    lambda company_name: [match for sub_name in split_company_names(company_name) 
-                          if (match := find_best_substring_match(company_name, sub_name, employer_names))]
-)
+def extract_matching_substrings(company_name):
+    # List comprehension to process each company and find matches
+    return [
+        match for sub_name in split_company_names(company_name)
+        for match in [find_best_substring_match(company_name, sub_name, employer_names)] if match
+    ]
+
+df['matched_substrings'] = df['company_name'].apply(extract_matching_substrings)
 
 # Print the DataFrame
 print(df)
