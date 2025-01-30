@@ -1,0 +1,46 @@
+import pandas as pd
+from rapidfuzz import fuzz
+import re
+
+def preprocess_for_matching(text):
+    """Preprocess text for matching by normalizing case and keeping meaningful characters."""
+    text = text.upper().strip()
+    text = re.sub(r'[^A-Z0-9\-\$]', ' ', text)  # Preserve hyphens and dollar signs
+    text = re.sub(r'\s+', ' ', text)  # Remove extra spaces
+    return text
+
+def split_company_names(text):
+    """Splits company names based on common delimiters like commas, ampersands, and slashes."""
+    return [name.strip() for name in re.split(r'[,&/]+', text) if name.strip()]
+
+def find_best_substring_match(original_text, sub_name, employer_names):
+    """Finds the best-matching substring from the original company name."""
+    sub_name_clean = preprocess_for_matching(sub_name)
+    
+    best_match = max(
+        [(emp, fuzz.partial_ratio(sub_name_clean, preprocess_for_matching(emp))) for emp in employer_names],
+        key=lambda x: x[1], default=(None, 0)
+    )
+
+    if best_match[1] > 75:  # Threshold for a strong match
+        match_start = original_text.upper().find(sub_name.upper())
+        if match_start != -1:
+            return original_text[match_start:match_start + len(sub_name)]
+
+    return None
+
+# Sample DataFrame
+data = {'company_name': ['MC DONALDS1234 ABC 123', 'ABC 123 SOLUTIONS', 'XYZ TECH99', 'HELLO-WORLD! XYZ TECH', '$123abc!']}
+df = pd.DataFrame(data)
+
+# List of employer names
+employer_names = ["MCDONALDS", "ABC 123", "XYZ TECHNOLOGIES", "HELLO WORLD", "$123abc123"]
+
+# Vectorized function to extract matching substrings for each company name
+df['matched_substrings'] = df['company_name'].apply(
+    lambda company_name: [match for sub_name in split_company_names(company_name) 
+                          if (match := find_best_substring_match(company_name, sub_name, employer_names))]
+)
+
+# Print the DataFrame
+print(df)
