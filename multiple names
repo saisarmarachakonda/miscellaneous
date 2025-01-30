@@ -1,4 +1,5 @@
 import pandas as pd
+import re
 from rapidfuzz import fuzz
 
 # Sample data
@@ -8,21 +9,29 @@ df = pd.DataFrame(data)
 # List of employer names
 employer_names = ["MCDONALDS", "ABC 123", "XYZ TECHNOLOGIES", "HELLO WORLD", "$123abc123"]
 
-# Function to find matched substrings and return them as a list of lists using RapidFuzz and list comprehension
+# Preprocessing function to remove special characters, extra spaces, and unicode characters
+def preprocess(text):
+    # Remove non-alphanumeric characters and spaces except for underscores and digits
+    text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation and special characters
+    text = re.sub(r'\s+', ' ', text)     # Collapse multiple spaces into one
+    text = text.strip()                  # Remove leading/trailing spaces
+    return text
+
+# Function to find matched substrings and return them as a list of lists using RapidFuzz
 def find_matched_substrings_as_lists_rapidfuzz(df, employer_names, threshold=75):
     return [
         [
             token
-            for token in company_name.split()
-            if any(fuzz.ratio(token, employer) >= threshold for employer in employer_names)
+            for token in preprocess(company_name).split()
+            if any(fuzz.ratio(token, preprocess(employer)) >= threshold for employer in employer_names)
         ] + [
-            ' '.join(company_name.split()[i:i+2])
-            for i in range(len(company_name.split()) - 1)
-            if any(fuzz.ratio(' '.join(company_name.split()[i:i+2]), employer) >= threshold for employer in employer_names)
+            ' '.join(preprocess(company_name).split()[i:i+2])
+            for i in range(len(preprocess(company_name).split()) - 1)
+            if any(fuzz.ratio(' '.join(preprocess(company_name).split()[i:i+2]), preprocess(employer)) >= threshold for employer in employer_names)
         ]
         for company_name in df['company_name']
-        if any(fuzz.ratio(token, employer) >= threshold for token in company_name.split() for employer in employer_names) or
-           any(fuzz.ratio(' '.join(company_name.split()[i:i+2]), employer) >= threshold for i in range(len(company_name.split()) - 1) for employer in employer_names)
+        if any(fuzz.ratio(token, preprocess(employer)) >= threshold for token in preprocess(company_name).split() for employer in employer_names) or
+           any(fuzz.ratio(' '.join(preprocess(company_name).split()[i:i+2]), preprocess(employer)) >= threshold for i in range(len(preprocess(company_name).split()) - 1) for employer in employer_names)
     ]
 
 # Get the list of matched substrings as lists using RapidFuzz
@@ -30,6 +39,7 @@ final_matched_lists = find_matched_substrings_as_lists_rapidfuzz(df, employer_na
 
 # Display the list of lists
 print(final_matched_lists)
+
 
 
 
