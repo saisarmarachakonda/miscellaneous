@@ -1,3 +1,74 @@
+import pandas as pd
+import re
+from rapidfuzz import fuzz
+
+# Sample data
+data = {'company_name': [
+    "AMAZON13 UNITED PARCEL AND WALMART", 
+    "AMAZON UBER", 
+    "AMAZON,UBER EATS", 
+    "DOORDASH", 
+    "INSTACARAMAZON", 
+    "AMAZONFLEX UBER AND ALSO INSTACART"
+]}
+df = pd.DataFrame(data)
+
+# List of employer names
+employer_names = ["AMAZON", "UBER", "UBER EATS", "DOORDASH", "INSTACART", "AMAZON FLEX", "WALMART"]
+
+# Preprocessing function for fuzzy matching
+def preprocess(text):
+    return re.sub(r'[^\w\s]', '', text).strip().lower()
+
+# Function to find matched substrings and split company_name based on matches
+def split_company_names(df, employer_names, threshold=80):
+    matched_lists = []
+    unmatched_texts = []
+
+    for company_name in df['company_name']:
+        matched_substrings = set()  # Store unique matched substrings
+        words = re.split(r'[,\s/&]+', company_name)  # Split on spaces, commas, slashes, &, etc.
+        
+        for employer in employer_names:
+            clean_employer = preprocess(employer)
+            
+            # Search for an exact match in company_name
+            for word in words:
+                if fuzz.partial_ratio(preprocess(word), clean_employer) >= threshold:
+                    matched_substrings.add(word)  # Store the exact matched substring
+
+            # Check entire company_name with fuzzy matching
+            match_ratio = fuzz.ratio(preprocess(company_name), clean_employer)
+            partial_match = fuzz.partial_ratio(preprocess(company_name), clean_employer)
+            token_set_match = fuzz.token_set_ratio(preprocess(company_name), clean_employer)
+
+            if max(match_ratio, partial_match, token_set_match) >= threshold:
+                if employer in company_name:
+                    matched_substrings.add(employer)  # Store exact match if found
+        
+        matched_substrings = list(matched_substrings)  # Convert set to list
+        
+        # Remove matched substrings from the original text
+        unmatched_text = company_name
+        for match in matched_substrings:
+            unmatched_text = unmatched_text.replace(match, "").strip()
+
+        # Append results
+        matched_lists.append(matched_substrings)
+        unmatched_texts.append(unmatched_text)
+
+    # Add results to DataFrame
+    df['matched_employers'] = matched_lists
+    df['remaining_text'] = unmatched_texts
+
+    return df
+
+# Apply function and store results in DataFrame
+df = split_company_names(df, employer_names)
+
+# Display the result
+df
+
 
 import pandas as pd
 import recordlinkage
