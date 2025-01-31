@@ -1,3 +1,59 @@
+from thefuzz import fuzz
+import pandas as pd
+
+# Sample data
+data = {'company_name': [
+    "AMAZON13 UNITED PARCEL AND WALMART", 
+    "AMAZON UBER", 
+    "AMAZON,UBER EATS", 
+    "DOORDASH", 
+    "INSTACARAMAZON", 
+    "AMAZONFLEX UBER AND ALSO INSTACART"
+]}
+df = pd.DataFrame(data)
+
+# List of employer names
+employer_names = ["AMAZON", "UBER", "UBER EATS", "DOORDASH", "INSTACART", "AMAZON FLEX", "WALMART"]
+
+# Function to generate one-token and two-token combinations
+def generate_tokens(text):
+    words = text.replace(',', ' ').split()  # Split on spaces and commas
+    one_tokens = words  # Single words
+    two_tokens = [' '.join(pair) for pair in zip(words, words[1:])]  # Consecutive word pairs
+    return one_tokens, two_tokens
+
+# Function to find best matches
+def get_best_matches(text, employer_names, threshold=50):
+    one_tokens, two_tokens = generate_tokens(text)
+    
+    best_matches = {}  # Dictionary to track the max score for each employer
+
+    # Check one-token matches
+    for token in one_tokens:
+        for employer in employer_names:
+            score = fuzz.partial_ratio(employer, token)
+            if score > threshold:
+                if employer not in best_matches or score > best_matches[employer]["partial_ratio"]:
+                    best_matches[employer] = {"matched": employer, "partial_ratio": score, "original_token": token}
+
+    # Check two-token matches
+    for token in two_tokens:
+        for employer in employer_names:
+            score = fuzz.partial_ratio(employer, token)
+            if score > threshold:
+                if employer not in best_matches or score > best_matches[employer]["partial_ratio"]:
+                    best_matches[employer] = {"matched": employer, "partial_ratio": score, "original_token": token}
+
+    return list(best_matches.values())  # Convert to list of dictionaries
+
+# Apply function and store results in a new column
+df['match_dict'] = df['company_name'].apply(lambda x: get_best_matches(x, employer_names))
+
+# Display the DataFrame
+print(df[['company_name', 'match_dict']])
+
+
+
 import pandas as pd
 import re
 from rapidfuzz import fuzz
