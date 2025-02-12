@@ -1,3 +1,15 @@
+def generate_char_ngrams(text):
+    text = text.replace(" ", "").replace(",", "")  # Remove spaces and commas
+    ngrams = set()  # Use a set to avoid duplicate n-grams
+
+    for n in range(1, len(text) + 1):  # From 1-gram to full length
+        for i in range(len(text) - n + 1):
+            ngrams.add(text[i:i + n])
+    
+    return list(ngrams)
+
+
+
 from thefuzz import fuzz
 import pandas as pd
 
