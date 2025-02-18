@@ -71,7 +71,70 @@ for idx, group in enumerate(groups, 1):
     print(f"Group {idx}: {sorted(group)}")  # Print sorted groups for consistency
 
 
+++++++++
 
+df = df.sort_values(by=['x', 'y'], ascending=[True, True]).reset_index(drop=True)
+
+# Define similarity threshold
+THRESHOLD = 80
+
+# Initialize groups as a list of sets
+groups = []
+
+# Function to add an element one at a time
+def add_to_groups(x_val, y_val):
+    matched_group = None
+
+    # Convert to lowercase for case-insensitive matching
+    x_val = x_val.lower()
+    y_val = y_val.lower()
+
+    # Create a list of all elements in existing groups for comparison
+    group_items = [item for group in groups for item in group]
+
+    # Use fuzzywuzzy process.extract to get the closest match for x_val and y_val from the group items
+    best_match_x = process.extractOne(x_val, group_items, scorer=fuzz.ratio)
+    best_match_y = process.extractOne(y_val, group_items, scorer=fuzz.ratio)
+
+    # Filter groups based on the best match
+    filtered_groups = []
+    if best_match_x and best_match_x[1] > THRESHOLD:
+        # Filter groups where a match is found for x_val
+        filtered_groups = [group for group in groups if best_match_x[0] in group]
+    
+    elif best_match_y and best_match_y[1] > THRESHOLD:
+        # Filter groups where a match is found for y_val
+        filtered_groups = [group for group in groups if best_match_y[0] in group]
+
+    # Sort groups before matching for consistency
+    for group in islice(filtered_groups, len(filtered_groups)):  
+        sorted_group = sorted(group, key=lambda item: item.lower())  # Sort in lowercase for consistency
+        
+        matches_x = [item for item in sorted_group if fuzz.ratio(x_val, item) > THRESHOLD]
+        matches_y = [item for item in sorted_group if fuzz.ratio(y_val, item) > THRESHOLD]
+
+        if len(matches_x) == len(group) or len(matches_y) == len(group):
+          if len(matches_x) == len(group):
+            group.update([x_val])
+          if len(matches_y) == len(group):
+            group.update([y_val]) 
+          matched_group =True
+          break
+
+    if not matched_group:
+        groups.append(set([x_val, y_val]))  # Create a new group with both x_val and y_val
+
+# Loop over the rows of the sorted dataframe and add each x, y pair to the groups
+for x_val, y_val in zip(df['x'], df['y']):
+    add_to_groups(x_val, y_val)
+
+# Print the grouped results
+for idx, group in enumerate(groups, 1):
+    print(f"Group {idx}: {sorted(group)}") 
+
+
+
++++++++
 
 def generate_char_ngrams(text):
     text = text.replace(" ", "").replace(",", "")  # Remove spaces and commas
