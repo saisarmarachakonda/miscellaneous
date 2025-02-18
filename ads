@@ -1,3 +1,36 @@
+
+# Define similarity threshold
+THRESHOLD = 80
+
+# Initialize groups as a list of sets
+groups = []
+
+# Iterate through each row
+for _, row in df.iterrows():
+    x_val, y_val = row["x"], row["y"]
+    matched_group = None
+
+    # Check each group for compatibility based on process.extract and fuzz.ratio > 80 for all elements
+    for group in groups:
+        # Extract the best matches for x_val and y_val from the group with process.extract
+        matches_x = [item for item, score, _ in process.extract(x_val, group, scorer=fuzz.ratio) if score > THRESHOLD]
+        matches_y = [item for item, score, _ in process.extract(y_val, group, scorer=fuzz.ratio) if score > THRESHOLD]
+
+        # Check if both x_val and y_val have matches in the group above the threshold
+        if matches_x and matches_y:
+            matched_group = group
+            break
+
+    if matched_group:
+        matched_group.update([x_val, y_val])  # Add new values to the existing group if they pass the similarity threshold
+    else:
+        groups.append(set([x_val, y_val]))  # Create a new group if no match is found
+
+# Convert sets to lists for better readability
+groups = [list(group) for group in groups]
+
+
+
 def generate_char_ngrams(text):
     text = text.replace(" ", "").replace(",", "")  # Remove spaces and commas
     ngrams = set()  # Use a set to avoid duplicate n-grams
