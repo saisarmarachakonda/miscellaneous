@@ -1,3 +1,34 @@
+import pandas as pd
+from rapidfuzz import fuzz
+from itertools import islice
+
+# Initializing the existing data
+data = {
+    "x": [
+        "amazon flix", "amazon flrx", "amazon lt", "amazon flex",
+        "amazon flex", "amazon flex", "amazon flex", "amazon dld",
+        "amazon ftw", "amazon lft",
+        "Amazon", "Amazon flex", "Amzn", "Amazonl", "Amazones",
+        "Amazon flexz", "Amazonflez", "Amzonc", "Amazonj", "Amazon",
+        "Amazonw", "Amazon flrx", "Amazones", "Amazonva", "Amazon c", "Amazon y",
+        "amazon flex", "Amazon lflez", "Amazon flex", "Amazon g",
+        "Amazon fulfilment cen", "Amzon full fillment xenter", "Amazon fulfilment center"
+    ],
+    "y": [
+        "amazon xlx", "amazons flex", "amazon y", "amazon flix",
+        "amazon flix", "amazon lex", "amazon xlx", "amazon dls",
+        "amazon tw", "amazon litaasad",
+        "Amazon", "Amazon flex", "Amzn", "Amazoan l", "Amazone a",
+        "Amazon flexz", "Amazonf lez", "Amzon r", "Amazon rfd", "Amazon ada",
+        "Amazon wt", "Amazon flrex", "Amazon es", "Amazon dava", "Amazon c", "Amazon y",
+        "amazon flexes", "Amazon llez", "Amazon llex", "Amazon bf",
+        "Amazon fulfilment center", "Amazon ful fulmetn cent", "Amzon full fillment xenter"
+    ]
+}
+df = pd.DataFrame(data)
+
+# Sort the DataFrame by both 'x' and 'y' columns before processing
+df = df.sort_values(by=['x', 'y'], ascending=[True, True]).reset_index(drop=True)
 
 # Define similarity threshold
 THRESHOLD = 80
@@ -5,29 +36,40 @@ THRESHOLD = 80
 # Initialize groups as a list of sets
 groups = []
 
-# Iterate through each row
-for _, row in df.iterrows():
-    x_val, y_val = row["x"], row["y"]
+# Function to add an element one at a time
+def add_to_groups(x_val, y_val):
     matched_group = None
 
-    # Check each group for compatibility based on process.extract and fuzz.ratio > 80 for all elements
-    for group in groups:
-        # Extract the best matches for x_val and y_val from the group with process.extract
-        matches_x = [item for item, score, _ in process.extract(x_val, group, scorer=fuzz.ratio) if score > THRESHOLD]
-        matches_y = [item for item, score, _ in process.extract(y_val, group, scorer=fuzz.ratio) if score > THRESHOLD]
+    # Convert to lowercase for case-insensitive matching
+    x_val = x_val.lower()
+    y_val = y_val.lower()
 
-        # Check if both x_val and y_val have matches in the group above the threshold
-        if matches_x and matches_y:
-            matched_group = group
-            break
+    # Sort groups before matching for consistency
+    for group in islice(groups, len(groups)):  
+        sorted_group = sorted(group, key=lambda item: item.lower())  # Sort in lowercase for consistency
+        
+        matches_x = [item for item in sorted_group if fuzz.ratio(x_val, item) > THRESHOLD]
+        matches_y = [item for item in sorted_group if fuzz.ratio(y_val, item) > THRESHOLD]
 
-    if matched_group:
-        matched_group.update([x_val, y_val])  # Add new values to the existing group if they pass the similarity threshold
-    else:
-        groups.append(set([x_val, y_val]))  # Create a new group if no match is found
+        if len(matches_x) == len(group) or len(matches_y) == len(group):
+          if len(matches_x) == len(group):
+            group.update([x_val])
+          if len(matches_y) == len(group):
+            group.update([y_val]) 
+          matched_group =True
+          break
 
-# Convert sets to lists for better readability
-groups = [list(group) for group in groups]
+    if not matched_group:
+        groups.append(set([x_val, y_val]))  # Create a new group with both x_val and y_val
+
+# Loop over the rows of the sorted dataframe and add each x, y pair to the groups
+for x_val, y_val in zip(df['x'], df['y']):
+    add_to_groups(x_val, y_val)
+
+# Print the grouped results
+for idx, group in enumerate(groups, 1):
+    print(f"Group {idx}: {sorted(group)}")  # Print sorted groups for consistency
+
 
 
 
