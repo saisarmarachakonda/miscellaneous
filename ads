@@ -1,3 +1,32 @@
+from fuzzywuzzy import process
+from fuzzywuzzy import fuzz
+
+# Define the target string and the list of strings to compare
+target = 'amazon xlx'
+choices = ['amazon flex', 'amazon xlx', 'amazon lex', 'amazons flex', 'amazon flrx', 'amazon flix']
+
+# Compute pairwise similarities using fuzzywuzzy.process.extract with fuzz.ratio as scorer
+matches = [item for item, score in process.extract(target, choices, scorer=fuzz.ratio, limit=None) if score > 80]
+
+print(matches)
+
+
+
+
+from rapidfuzz import process, fuzz
+
+# Define the target string and the list of strings to compare
+target = 'Amazon flex'
+choices = ['amazon flex', 'amazon xlx', 'amazon lex', 'amazons flex', 'amazon flrx', 'amazon flix']
+
+# Compute pairwise similarities using process.extract with fuzz.ratio as scorer
+matches = [item for item, score, _ in process.extract(target, choices, scorer=fuzz.ratio) if score > 80]
+
+print(matches)
+
+
+
+
 import pandas as pd
 from rapidfuzz import fuzz
 from itertools import islice
