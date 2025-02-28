@@ -12,7 +12,7 @@ known_words = set(spell.known(spell.word_frequency.keys()))
 
 specific_words = ['lex']
 
-print('lex' in known_words)
+print('compact' in known_words)
 
 # Initialize NLP tools
 lemmatizer = WordNetLemmatizer()
@@ -49,7 +49,8 @@ def check_wordnet_presence(word):
 def check_synonym_match(word1, word2):
     syn1 = {lemma.name() for synset in wordnet.synsets(word1) for lemma in synset.lemmas()}
     syn2 = {lemma.name() for synset in wordnet.synsets(word2) for lemma in synset.lemmas()}
-    return bool(syn1 & syn2)
+    is_synonym = bool(syn1 & syn2)
+    return is_synonym
 
 def phonetic_similarity(word1, word2):
     edtx_sim=  editex.sim(word1, word2) 
@@ -202,6 +203,8 @@ def compare_company_names(new_company, company_groups):
 
                 fuzzy_matches = process.extract(new_company_norm, sublist, scorer=fuzz.ratio, limit=None)
                 fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches] if fuzzy_matches else []
+                # fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches if match[1] > 80] if fuzzy_matches else []
+
 
                 if len(fuzzy_matches) != len(sublist) or not fuzzy_matches:
                     continue 
@@ -224,7 +227,7 @@ def compare_company_names(new_company, company_groups):
                         if check_wordnet_presence(word):
                             valid_existing_words = [
                                 ex_word for ex_word in existing_words[1:]
-                                if check_wordnet_presence(ex_word) and ex_word in new_words
+                                if check_wordnet_presence(ex_word)
                             ]
                             if valid_existing_words and not any(check_synonym_match(word, ex_word) for ex_word in valid_existing_words):
                                 all_conditions_met = False
@@ -276,38 +279,9 @@ def compare_company_names(new_company, company_groups):
     return {"accepted": accepted}
 
 
-def compare_company_name_pairs(company_pairs, company_groups):
-    """Compare pairs of company names and determine whether to group them."""
-    results = []
-
-    for new_company1, new_company2 in company_pairs:
-        similarity_score = fuzz.ratio(new_company1, new_company2)
-
-        if similarity_score > 85:
-            key = get_name([new_company1, new_company2]) 
-
-            if key in company_groups:
-                company_groups[key].append([new_company1, new_company2])
-            else:
-                company_groups[key] = [[new_company1, new_company2]]
-
-            results.append({"accepted": True, "reason": f"Grouped '{new_company1}' and '{new_company2}' under '{key}'."})
-        else:
-            result1 = compare_company_names(new_company1, company_groups)
-            result2 = compare_company_names(new_company2, company_groups)
-            results.append({"company1": result1, "company2": result2})
-
-    return results
 
 existing_companies = defaultdict(list)
-new_companies =  [
-    "infosys contracts", "infosys constructions", "infysys bds construction", "infosys contrac",  "amazon flex", "amazons flex", "amazon",
-    "amazon flix", "amazon xlx", "amazon fle", "amazon xlx", "amazon y", "amazon flix",
-    "amazon lex", "amazon xlx", "amazon dls", "amazonn", "amazon", "amazpnp", "amazonj", "amazon tw", "amazon", "amzn",
-    "amazoan l", "amazone a", "amazon flexz", "amazonf lez", "amzon r", "amazon rfd", "amazon ada", "amazon litaasad",
-    "amazon wt", "amazon flrex", "amazon es", "amazon dava", "amazon c", "amazon y", "amazon flexes", "amazon llez", "amazon llex",
-    "amazon bf", "amazon fulfilment center", "amazon ful fulmetn cent", "amzon full fillment xenter"
-]
+
 
 new_companies = sorted(new_companies, key=lambda item: item.lower())
 
