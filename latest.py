@@ -53,10 +53,22 @@ def check_synonym_match(word1, word2):
     return is_synonym
 
 def phonetic_similarity(word1, word2):
-    edtx_sim=  editex.sim(word1, word2) 
-    mra_sim = mra.sim(word1, word2)
-    return edtx_sim  >= 0.6  and mra_sim  >= 0.5
+    length = min(len(word1), len(word2))
+    
+    # Adjust thresholds dynamically based on length
+    if length <= 3:
+        edtx_thresh, mra_thresh = 0.6, 0.6 
+    elif length <= 4:
+        edtx_thresh, mra_thresh = 0.7, 0.7  # Stricter for short words
+    elif length <= 8:
+        edtx_thresh, mra_thresh = 0.6, 0.5  # Moderate
+    else:
+        edtx_thresh, mra_thresh = 0.5, 0.4  # More lenient for longer words
 
+    edtx_sim = editex.sim(word1, word2)
+    mra_sim = mra.sim(word1, word2)
+    
+    return edtx_sim >= edtx_thresh and mra_sim >= mra_thresh
 def find_best_matching_groups(new_company, company_groups):
     new_company_norm = preprocess_company_name(new_company)
     results = process.extract(new_company_norm, company_groups.keys(), scorer=fuzz.ratio, limit=None)
@@ -233,6 +245,10 @@ def compare_company_names(new_company, company_groups):
                                 all_conditions_met = False
                                 reject_reason = f"'{word}' failed synonym check."
                                 break
+                            elif not any(phonetic_similarity(word, ex_word) for ex_word in existing_words[1:]):
+                                all_conditions_met = False
+                                reject_reason = f"'{word}' failed phonetic similarity check."
+                                break
                         else:
                             if not any(phonetic_similarity(word, ex_word) for ex_word in existing_words[1:]):
                                 all_conditions_met = False
@@ -281,11 +297,3 @@ def compare_company_names(new_company, company_groups):
 
 
 existing_companies = defaultdict(list)
-
-
-new_companies = sorted(new_companies, key=lambda item: item.lower())
-
-for new_comp in new_companies:
-    result = compare_company_names(new_comp, existing_companies)
-    print(result)
-    print('existing_companies', existing_companies)
