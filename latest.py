@@ -7,14 +7,18 @@ from spellchecker import SpellChecker
 import itertools
 from collections import defaultdict
 
+from spellchecker import SpellChecker
+import nltk
+from nltk.stem import WordNetLemmatizer
+from collections import Counter
+
+from functools import partial
+
+
+# nltk.download("wordnet")
+
+# Initialize SpellChecker and Lemmatizer
 spell = SpellChecker()
-known_words = set(spell.known(spell.word_frequency.keys()))
-
-specific_words = ['lex']
-
-print('compact' in known_words)
-
-# Initialize NLP tools
 lemmatizer = WordNetLemmatizer()
 stemmer = PorterStemmer()
 editex = Editex()
@@ -24,6 +28,15 @@ def get_wordnet_pos(word):
     tag = nltk.pos_tag([word])[0][1][0].upper()
     tag_dict = {"J": wordnet.ADJ, "N": wordnet.NOUN, "V": wordnet.VERB, "R": wordnet.ADV}
     return tag_dict.get(tag, wordnet.NOUN)
+
+known_words = spell.known(spell.word_frequency.keys())
+known_words = {lemmatizer.lemmatize(word, get_wordnet_pos(word)) for word in known_words}
+
+
+specific_words = {'lex'}
+
+known_words = known_words | specific_words
+
 
 def preprocess_company_name(name):
     name = name.lower()
@@ -42,33 +55,76 @@ def preprocess_company_name(name):
 
 def check_wordnet_presence(word):
     if len(word) < 3:
-        return False
+        return True
     wordnet_presence =  word in known_words
     return wordnet_presence
 
-def check_synonym_match(word1, word2):
-    syn1 = {lemma.name() for synset in wordnet.synsets(word1) for lemma in synset.lemmas()}
-    syn2 = {lemma.name() for synset in wordnet.synsets(word2) for lemma in synset.lemmas()}
-    is_synonym = bool(syn1 & syn2)
-    return is_synonym
+from nltk.corpus import wordnet
 
-def phonetic_similarity(word1, word2):
-    length = min(len(word1), len(word2))
-    
-    # Adjust thresholds dynamically based on length
-    if length <= 3:
-        edtx_thresh, mra_thresh = 0.6, 0.6 
-    elif length <= 4:
-        edtx_thresh, mra_thresh = 0.7, 0.7  # Stricter for short words
-    elif length <= 8:
-        edtx_thresh, mra_thresh = 0.6, 0.5  # Moderate
-    else:
-        edtx_thresh, mra_thresh = 0.5, 0.4  # More lenient for longer words
+# Function to calculate synonym similarity percentage
+def check_synonym_match(word1, word2, threshold=90):
+    synsets1 = wordnet.synsets(word1)
+    synsets2 = wordnet.synsets(word2)
 
-    edtx_sim = editex.sim(word1, word2)
-    mra_sim = mra.sim(word1, word2)
+    if not synsets1 or not synsets2:
+        return False
+
+    # Compute the max Wu-Palmer similarity
+    max_similarity = max(
+        (s1.wup_similarity(s2) or 0) for s1 in synsets1 for s2 in synsets2
+    ) * 100  # Convert to percentage
+
+    print(max_similarity)
+    return max_similarity >= threshold  
+
+def lists_have_same_known_words(list1, list2):
+    """
+    Step 1: Filter both lists to only include words present in raw_known_words and ignore words < 3 chars.
+    Step 2: Compare the filtered sets. Return True if they are the same, otherwise False.
+    """
+    filtered_list1 = {word for word in list1 if len(word) >= 3 and word in known_words}
+    filtered_list2 = {word for word in list2 if len(word) >= 3 and word in known_words}
     
-    return edtx_sim >= edtx_thresh and mra_sim >= mra_thresh
+    return filtered_list1 == filtered_list2
+
+
+def is_phonetically_similar(list1, list2):
+    def phonetic_similarity(word1, word2):
+        length = min(len(word1), len(word2))
+        
+        # Adjust thresholds dynamically based on length
+        if length <= 3:
+            edtx_thresh = 0.6  
+        elif length <= 4:
+            edtx_thresh = 0.7  # Stricter for short words
+        elif length <= 8:
+            edtx_thresh = 0.6  # Moderate
+        else:
+            edtx_thresh = 0.5  # More lenient for longer words
+
+        edtx_sim = editex.sim(word1, word2)
+
+        return edtx_sim >= edtx_thresh
+
+    def find_best_match(word, candidates):
+        """Find the best phonetically similar match for a word in a list of candidates."""
+        for candidate in candidates:
+            if phonetic_similarity(word, candidate):
+                return True
+        return False
+
+    # Filter out two-letter words
+    filtered_list1 = [word for word in list1 if len(word) > 2]
+    filtered_list2 = [word for word in list2 if len(word) > 2]
+
+    # Ensure all words in list1 have a similar match in list2
+    for word in filtered_list1:
+        if not find_best_match(word, filtered_list2):
+            return False
+
+    return True 
+
+
 def find_best_matching_groups(new_company, company_groups):
     new_company_norm = preprocess_company_name(new_company)
     results = process.extract(new_company_norm, company_groups.keys(), scorer=fuzz.ratio, limit=None)
@@ -102,19 +158,6 @@ def process_text(original_word):
             processed_tokens.append(lemma)
     return " ".join(processed_tokens)
 
-from spellchecker import SpellChecker
-import nltk
-from nltk.stem import WordNetLemmatizer
-from collections import Counter
-
-# nltk.download("wordnet")
-
-# Initialize SpellChecker and Lemmatizer
-# spell = SpellChecker()
-lemmatizer = WordNetLemmatizer()
-
-raw_known_words = spell.known(spell.word_frequency.keys())
-known_words = {lemmatizer.lemmatize(word, get_wordnet_pos(word)) for word in raw_known_words}
 
 
 def get_name(phrases):
@@ -161,9 +204,8 @@ def get_name(phrases):
     else:
         new_name = max(phrases, key=lambda phrase: len(phrase.split()))
 
-    if new_name == 'amazon lex':
-        print()
     return new_name
+
 
 
 def update_and_rename_key(data, old_key, sublist_index, new_value, new_key=None):
@@ -187,6 +229,84 @@ def filter_best_match_keys(new_company, best_match_keys):
         if abs(len(new_company_stripped) - len(key.replace(" ", "").lower())) < 4
     ]
 
+
+def find_mismatched_words(list1, list2, known_words):
+    """
+    Finds words in list1 and list2 that are not common and may require similarity checks.
+    Returns `not_valid1` and `not_valid2` while preserving the order of `list1` and `list2`.
+    """    
+    valid_list1 = [word for word in list1 if word in known_words]
+    valid_list2 = [word for word in list2 if word in known_words]
+
+    common_words = set(valid_list1) & set(valid_list2)
+
+    not_valid1 = [word for word in list2 if word not in common_words]
+    not_valid2 = [word for word in list1 if word not in common_words]
+
+    return not_valid1, not_valid2
+
+
+def custom_sort(word, key):
+    return [word[i] if i < len(word) and i < len(key) and 
+            word[i] == key[i] else "" for i in range(len(key))], word
+
+def phonetic_similarity_check(word1, word2):
+    length = min(len(word1), len(word2))
+    
+    if length <= 3:
+        edtx_thresh, mra_thresh = 0.6, 0.6 
+    elif length <= 4:
+        edtx_thresh, mra_thresh = 0.65, 0.65
+    elif length <= 8:
+        edtx_thresh, mra_thresh = 0.6, 0.5
+    else:
+        edtx_thresh, mra_thresh = 0.5, 0.4
+    
+    edtx_sim = editex.sim(word1, word2) or 0.0
+    mra_sim = mra.sim(word1, word2) or 0.0
+    
+    if edtx_sim >= edtx_thresh and mra_sim >= mra_thresh:
+        return (edtx_sim + mra_sim) / 2
+    return 0.0
+
+def phonetic_scorer(word1, word2, score_cutoff=0):
+    score = int(phonetic_similarity_check(word1, word2) * 100)
+    return score if score >= score_cutoff else 0
+
+def all_phonetic_matches(un_intersected_list1, un_intersected_list2):
+    phonetic_matches = {}
+    
+    sorted_list1 = sorted(un_intersected_list1)
+    sorted_list2 = sorted(un_intersected_list2)
+    
+    for word1 in sorted_list1:
+        if sorted_list2:
+            sorted_list2 = sorted(sorted_list2, key=partial(custom_sort, key=word1), reverse=True)
+            
+            best_match = process.extractOne(
+                word1, sorted_list2, scorer=phonetic_scorer
+            )
+            
+            if best_match and best_match[1] > 0:
+                phonetic_matches[word1] = (best_match[0], best_match[1])
+    
+    return phonetic_matches
+
+def analyze_lists_with_phonetics(list1, list2):
+    set1, set2 = set(list1), set(list2)
+    
+    un_intersected_list1 = set1 - set2
+    un_intersected_list2 = set2 - set1
+    
+    phonetic_matches = all_phonetic_matches(un_intersected_list1, un_intersected_list2)
+    
+    return {
+        "un_intersected_list1": un_intersected_list1,
+        "un_intersected_list2": un_intersected_list2,
+        "phonetic_matches": phonetic_matches,
+    }
+
+
 def compare_company_names(new_company, company_groups):
     """Compare a new company name with existing company groups using lists of lists."""
     best_match_keys = find_best_matching_groups(new_company, company_groups)
@@ -195,7 +315,7 @@ def compare_company_names(new_company, company_groups):
     accepted = False
     reject_reason = None
     
-    if new_company == 'amazon fle':
+    if new_company == 'amazon c':
         print("")
     if not best_match_keys:
         company_groups[new_company] = [[new_company]]
@@ -214,8 +334,8 @@ def compare_company_names(new_company, company_groups):
                     return {"accepted": False, "reason": f"'{new_company}' already exists."}
 
                 fuzzy_matches = process.extract(new_company_norm, sublist, scorer=fuzz.ratio, limit=None)
-                fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches] if fuzzy_matches else []
-                # fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches if match[1] > 80] if fuzzy_matches else []
+                # fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches] if fuzzy_matches else []
+                fuzzy_matches = [(match[0], match[1]) for match in fuzzy_matches if match[1] > 80] if fuzzy_matches else []
 
 
                 if len(fuzzy_matches) != len(sublist) or not fuzzy_matches:
@@ -224,38 +344,44 @@ def compare_company_names(new_company, company_groups):
                 all_conditions_met = True
                 
                 for existing_company, _ in fuzzy_matches:
+
+                    if not existing_company.replace(" ", "")[:3].lower() == new_company_norm.replace(" ", "")[:3].lower():
+                        reject_reason = f" {new_company_norm} Failed acronym check {existing_company}'"
+                        all_conditions_met = False
+                        break
+
                     existing_words = existing_company.split()
                     new_words = new_company_norm.split()
+                    existing_words = [existing_words[0]] + [preprocess_company_name(word) for word in existing_words[1:]]
 
                     if fuzz.ratio(new_words[0], existing_words[0]) < 86:
                         all_conditions_met = False
                         reject_reason = f"'{new_words[0]}' failed first word similarity check with '{existing_words[0]}'"
                         break
 
-                    for word in new_words[1:]:
-                        if len(word) < 3:
-                            continue  # Skip words with less than 2 letters
+                    not_valid1, not_valid2 = find_mismatched_words(new_words[1:], existing_words[1:], known_words)
 
-                        if check_wordnet_presence(word):
-                            valid_existing_words = [
-                                ex_word for ex_word in existing_words[1:]
-                                if check_wordnet_presence(ex_word)
-                            ]
-                            if valid_existing_words and not any(check_synonym_match(word, ex_word) for ex_word in valid_existing_words):
-                                all_conditions_met = False
-                                reject_reason = f"'{word}' failed synonym check."
-                                break
-                            elif not any(phonetic_similarity(word, ex_word) for ex_word in existing_words[1:]):
-                                all_conditions_met = False
-                                reject_reason = f"'{word}' failed phonetic similarity check."
-                                break
-                        else:
-                            if not any(phonetic_similarity(word, ex_word) for ex_word in existing_words[1:]):
-                                all_conditions_met = False
-                                reject_reason = f"'{word}' failed phonetic similarity check."
-                                break
-                    if not all_conditions_met:
+                    result = analyze_lists_with_phonetics(not_valid1, not_valid2)
+
+                    discrepancies = {
+                        word: match
+                        for word, (match, _) in result['phonetic_matches'].items()
+                        if word in known_words and match in known_words and word != match
+                    }
+
+                    if discrepancies:
+                        all_conditions_met = False
+                        reject_reason = f"'{new_words[0]}' failed phonetic check"
                         break
+
+                    
+                    phonetic_sim = mra.sim(" ".join(not_valid1), " ".join(not_valid2)) 
+                    
+                    if phonetic_sim < 0.7:
+                        all_conditions_met = False
+                        reject_reason = f"'{new_words[0]}' failed first word similarity check with '{existing_words[0]}'"
+                        break
+
                 
                 if all_conditions_met:
                     update_and_rename_key(company_groups, best_match_key, sublist_index, new_company)
@@ -265,21 +391,37 @@ def compare_company_names(new_company, company_groups):
                     return {"accepted": True, "reason": f"'{new_company}' added to sublist {sublist_index}, key updated to '{new_key_name}'."}
 
         # If none of the conditions were met, check for phonetic similarity with the best match key
-        check2 = process.extractOne(new_company_norm, best_match_keys, scorer=fuzz.ratio)
+        root_key_match = process.extractOne(new_company_norm, best_match_keys, scorer=fuzz.ratio)
 
-        if check2 and check2[1] > 88:
-            best_match_key = check2[0]  # Extracted best match key
+        if root_key_match and root_key_match[1] > 88:
+            best_match_key = root_key_match[0]  # Extracted best match key
 
             # Extract words excluding the first word
             best_match_words = best_match_key.split()[1:]  
             new_company_words = new_company.split()[1:]
+            suffix1, suffix2 =  " ".join(best_match_words), " ".join(new_company_words)
+            mra_sim = mra.sim(suffix1, suffix2)
 
-            suffix_ratio = fuzz.ratio(" ".join(best_match_words), " ".join(new_company_words))
+            suffix_ratio = fuzz.ratio(suffix1,suffix2)
+
+
+            result = analyze_lists_with_phonetics(best_match_words, new_company_words)
+
+            discrepancies = {
+                word: match
+                for word, (match, _) in result['phonetic_matches'].items()
+                if word in known_words and match in known_words and word != match
+            }
 
             # Compare phonetic similarity word by word
-            if suffix_ratio > 86 and any(phonetic_similarity(word, ex_word) for word in new_company_words for ex_word in best_match_words):
-                company_groups[best_match_key].append([new_company])
-                return {"accepted": True, "reason": f"'{new_company}' added as a new sublist under '{best_match_key}'."}
+            if suffix_ratio > 86 and mra_sim > 0.8 and not discrepancies:
+                if len(best_match_words) ==  0 and len(new_company_words) == 0:
+                    company_groups[best_match_key].append([new_company])
+                    return {"accepted": True, "reason": f"'{new_company}' added as a new sublist under '{best_match_key}'."}
+                else:
+                    new_key = get_name([new_company])
+                    company_groups[new_key].append([new_company])
+                    return {"accepted": True, "reason": f"'{new_company}' added as a new sublist under '{best_match_key}'."}
 
         # If no suitable match is found, create a new key
         new_key = get_name([new_company])
@@ -297,3 +439,13 @@ def compare_company_names(new_company, company_groups):
 
 
 existing_companies = defaultdict(list)
+
+
+
+new_companies = sorted(new_companies, key=lambda item: item.lower())
+
+for new_comp in new_companies:
+    result = compare_company_names(new_comp, existing_companies)
+    print(result)
+    print('existing_companies', existing_companies)
+
