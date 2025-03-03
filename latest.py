@@ -15,6 +15,38 @@ from collections import Counter
 from functools import partial
 
 
+import itertools
+from collections import Counter
+
+def get_name(phrases):
+    # Step 1: Lemmatize phrases
+    lemmatized_phrases = {
+        phrase: " ".join(lemmatizer.lemmatize(word, get_wordnet_pos(word)) for word in phrase.split()) for phrase in phrases
+    }
+
+    # Step 2: Extract words from lemmatized phrases and count valid words
+    words = list(itertools.chain(*[phrase.split() for phrase in lemmatized_phrases.values()]))
+    valid_word_counts = Counter(word for word in words if word in known_words)
+
+    # Step 3: Apply filtering rules to each phrase
+    filtered_phrases = []
+    
+    for original_phrase in phrases:
+        words = original_phrase.split()
+        filtered_words = [words[0]]  # Always keep the first word
+
+        for word in words[1:]:  # Process from the second word onwards
+            lemmatized_word = lemmatizer.lemmatize(word, get_wordnet_pos(word))
+            if len(word) > 3 or (len(word) == 3 and lemmatized_word in known_words):  
+                filtered_words.append(word)
+
+        filtered_phrases.append(" ".join(filtered_words))
+
+    # Step 4: Return the longest filtered phrase
+    return max(filtered_phrases, key=lambda phrase: len(phrase.split()))
+
+
+
 # nltk.download("wordnet")
 
 # Initialize SpellChecker and Lemmatizer
