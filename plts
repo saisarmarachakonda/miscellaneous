@@ -1,0 +1,90 @@
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Sample data with identity_id and parent_name
+data = {
+    'identity_id': [101, 101, 101, 102, 102, 103, 103, 104, 104, 104, 105, 106, 106, 107, 107, 107, 108, 109, 110, 110],
+    'employer_name': ['Walmart', 'Wal Mart', 'Amazon', 'Google', 'Alphabet', 
+                      'TCS', 'TCS', 'Microsoft', 'MSFT', 'Apple', 'Amazon', 'Tesla', 'TSLA', 'Infosys', 'INFY', 'IBM',
+                      'Accenture', 'Facebook', 'Google', 'Meta'],
+    'parent_name': ['Walmart', 'Walmart', 'Amazon', 'Google', 'Alphabet', 
+                    'TCS', 'TCS', 'Microsoft', 'Microsoft', 'Apple', 'Amazon', 'Tesla', 'Tesla', 'Infosys', 'Infosys', 'IBM',
+                    'Accenture', 'Meta', 'Google', 'Meta']
+}
+
+# Create DataFrame
+df = pd.DataFrame(data)
+
+# Check if parent_name differs from employer_name
+df['standardized_impact'] = df['employer_name'] != df['parent_name']
+
+# Count how many names were changed by standardization per identity_id
+impact_counts = df.groupby('identity_id')['standardized_impact'].sum().reset_index()
+impact_counts.columns = ['identity_id', 'num_standardization_changes']
+
+# Display the results
+print("\nImpact of Standardization:")
+print(impact_counts)
+
+
+# Overall statistics
+total_customers = impact_counts.shape[0]
+total_changes = impact_counts['num_standardization_changes'].sum()
+avg_changes_per_customer = impact_counts['num_standardization_changes'].mean()
+median_changes = impact_counts['num_standardization_changes'].median()
+max_changes = impact_counts['num_standardization_changes'].max()
+min_changes = impact_counts['num_standardization_changes'].min()
+std_dev_changes = impact_counts['num_standardization_changes'].std()
+
+# Display overall stats
+print("\nOverall Standardization Impact Stats:")
+print(f"Total Customers: {total_customers}")
+print(f"Total Standardized Changes: {total_changes}")
+print(f"Average Changes per Customer: {avg_changes_per_customer:.2f}")
+print(f"Median Changes per Customer: {median_changes}")
+print(f"Maximum Changes by a Customer: {max_changes}")
+print(f"Minimum Changes by a Customer: {min_changes}")
+print(f"Standard Deviation in Changes: {std_dev_changes:.2f}")
+
+
+plt.figure(figsize=(12, 6))
+sns.histplot(impact_counts['num_standardization_changes'], bins=10, kde=True, color='blue')
+plt.title('Distribution of Standardization Changes per Customer')
+plt.xlabel('Number of Standardized Changes')
+plt.ylabel('Number of Customers')
+plt.grid(True)
+plt.show()
+
+
+# Identify stable and impacted customers
+stable = (impact_counts['num_standardization_changes'] == 0).sum()
+impacted = (impact_counts['num_standardization_changes'] > 0).sum()
+
+# Pie chart visualization
+plt.figure(figsize=(7, 7))
+plt.pie(
+    [stable, impacted],
+    labels=['Stable', 'Impacted by Standardization'],
+    autopct='%1.1f%%',
+    startangle=140,
+    colors=['#4CAF50', '#FF6347']
+)
+plt.title('Stable vs. Impacted by Standardization')
+plt.show()
+
+
+plt.figure(figsize=(8, 6))
+sns.boxplot(x=impact_counts['num_standardization_changes'], color='orange')
+plt.title('Box Plot of Standardization Changes')
+plt.xlabel('Number of Standardized Changes')
+plt.show()
+
+
+plt.figure(figsize=(10, 5))
+sns.countplot(x=impact_counts['num_standardization_changes'], palette='coolwarm')
+plt.title('Count of Customers by Standardization Changes')
+plt.xlabel('Number of Standardized Changes')
+plt.ylabel('Number of Customers')
+plt.grid(True)
+plt.show()
