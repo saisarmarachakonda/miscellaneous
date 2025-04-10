@@ -1,3 +1,34 @@
+import pandas as pd
+
+# Sample data
+df = pd.DataFrame({
+    'date_column': pd.to_datetime(['2024-09-30', '2024-10-01', '2025-01-15', '2025-03-31', '2025-04-01', '2025-06-30', '2025-07-01'])
+})
+
+# Define snapshot date
+snapshot_date = pd.to_datetime('2025-04-01')
+
+# Define fiscal year start as snapshot_date - 6 months
+fiscal_start = snapshot_date - pd.DateOffset(months=6)  # → 2024-10-01
+
+# Calculate how many months each date is from the fiscal start
+months_from_fiscal_start = ((df['date_column'].dt.year - fiscal_start.year) * 12 +
+                            (df['date_column'].dt.month - fiscal_start.month))
+
+# Quarter: rotate every 3 months from fiscal_start
+df['custom_quarter'] = (months_from_fiscal_start // 3 % 4) + 1
+
+# Fiscal year logic: base on number of full 12-month periods since fiscal_start
+df['custom_year'] = fiscal_start.year + (months_from_fiscal_start // 12)
+
+# Optional: combine as label
+df['fiscal_label'] = 'Q' + df['custom_quarter'].astype(str) + ' FY' + df['custom_year'].astype(str)
+
+print(df)
+
+
+
+
 from fuzzywuzzy import process
 from fuzzywuzzy import fuzz
 
